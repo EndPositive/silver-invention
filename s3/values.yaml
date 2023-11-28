@@ -99,6 +99,8 @@ buckets: []
 ## when Chart is deployed
 environment:
   MINIO_STORAGE_CLASS_STANDARD: EC:4
+  MINIO_PROMETHEUS_URL: http://prometheus-k8s.monitoring.svc.cluster.local:9090
+  MINIO_PROMETHEUS_JOB_ID: minio
 ## Please refer for comprehensive list https://min.io/docs/minio/linux/reference/minio-server/minio-server.html
 ## MINIO_SUBNET_LICENSE: "License key obtained from https://subnet.min.io"
 ## MINIO_BROWSER: "off"
