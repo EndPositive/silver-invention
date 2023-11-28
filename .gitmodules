@@ -1,0 +1,3 @@
+[submodule "monitoring/kube-prometheus"]
+	path = monitoring/kube-prometheus
+	url = git@github.com:prometheus-operator/kube-prometheus.git
