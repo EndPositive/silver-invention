@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-configdb-service
+  labels:
+    app: mongo-configdb
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+  clusterIP: None
+  selector:
+    app: mongo-configdb
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-configdb
+spec:
+  selector:
+    matchLabels:
+      app: mongo-configdb 
+  serviceName: mongo-configdb-service
+  replicas: 3 
+  template:
+    metadata:
+      labels:
+        role: mongo-configdb
+        tier: configdb
+        replicaset: rs-config-server
+        app: mongo-configdb 
+    spec:
+      affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: replicaset
+                    operator: In
+                    values:
+                    - rs-config-server
+                topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 10
+      # Volume is needed in order to synchronize and allow node's visibility through the cluster
+      volumes:
+        - name: secrets-volume
+          secret:
+            secretName: shared-bootstrap-data
+            defaultMode: 256
+      containers:
+      - name: mongo-configdb
+        image:  mongo:latest
+        command:
+          - "mongod"
+          - "--port"
+          - "27017"
+          - "--bind_ip"
+          - "0.0.0.0"
+          - "--configsvr"
+          - "--replSet"
+          - "rs-config-server"
+          - "--auth"
+          - "--clusterAuthMode"
+          - "keyFile"
+          - "--keyFile"
+          - "/etc/secrets-volume/internal-auth-mongodb-keyfile"
+          - "--setParameter"
+          - "authenticationMechanisms=SCRAM-SHA-1"
+        ports:
+          - containerPort: 27017
+        
+        volumeMounts:
+          - name: secrets-volume
+            readOnly: true
+            mountPath: /etc/secrets-volume
+          - name: mongo-config-data
+            mountPath: /data/db
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-config-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
