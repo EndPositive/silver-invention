@@ -1,0 +1,28 @@
+auth:
+  enabled: true
+  rootUser: root
+  rootPassword: "root"
+
+shards: 3
+
+configsvr:
+  replicaCount: 3
+
+mongos:
+  replicaCount: 3
+
+shardsvr:
+  dataNode:
+    replicaCount: 3
+  
+  persistence:
+    size: 8Gi
+  
+  arbiter:
+    replicaCount: 0
+
+metrics:
+  enabled: true
+  podMonitor:
+    enabled: true
+    namespace: mongodb
