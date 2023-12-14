@@ -21,5 +21,5 @@ kubectl --namespace monitoring port-forward svc/grafana 3000
 # Uninstall
 
 ```shell
-kubectl delete --ignore-not-found=true -f manifests/ -f manifests/setup
+kubectl delete --ignore-not-found=true -f kube-prometheus/manifests/ -f kube-prometheus/manifests/setup
 ```
