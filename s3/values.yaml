@@ -67,7 +67,7 @@ topologySpreadConstraints: []
 ##
 resources:
   requests:
-    memory: 2Gi
+    memory: 200Mi
 
 users: []
 

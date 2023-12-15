@@ -3,7 +3,7 @@ auth:
   rootUser: root
   rootPassword: "root"
 
-shards: 3
+shards: 2
 
 configsvr:
   replicaCount: 3
