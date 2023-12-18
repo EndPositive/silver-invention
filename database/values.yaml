@@ -7,6 +7,9 @@ shards: 2
 
 configsvr:
   replicaCount: 3
+  mongodbExtraFlags:
+    # because docker may be offline for a while
+    - "--setParameter rollbackTimeLimitSecs=10000000"
 
 mongos:
   replicaCount: 3
