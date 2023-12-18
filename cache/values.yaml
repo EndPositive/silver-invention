@@ -3,6 +3,13 @@ architecture: replication
 auth:
   password: "root"
 
+master:
+  replicaCount: 1
+  ## @param replica.configuration Configuration for Redis&reg; replicas nodes
+  ## ref: https://redis.io/topics/config
+  ##
+  configuration: ""
+
 replica:
   replicaCount: 3
   ## @param replica.configuration Configuration for Redis&reg; replicas nodes
@@ -10,8 +17,6 @@ replica:
   ##
   configuration: ""
 
-sentinel:
-  enabled: true
 
 metrics:
   enabled: true
