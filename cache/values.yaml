@@ -1,0 +1,21 @@
+architecture: replication
+
+auth:
+  password: "root"
+
+replica:
+  replicaCount: 3
+  ## @param replica.configuration Configuration for Redis&reg; replicas nodes
+  ## ref: https://redis.io/topics/config
+  ##
+  configuration: ""
+
+sentinel:
+  enabled: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+  podMonitor:
+    enabled: true
