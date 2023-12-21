@@ -51,6 +51,8 @@ sh.addTagRange("database.articles_science", {category: "science"}, {region: "sci
 sh.enableSharding("articles_science");
 db.articles_science.createIndex({ category: 1 });
 
+sh.shardCollection("database.articles", { category: 1 });
+sh.shardCollection("database.articles_science", { category: 1 });
 db.articles.getShardDistribution(); // verify chunks distributed on shards
 db.articles_science.getShardDistribution(); // verify chunks distributed on shards
 
