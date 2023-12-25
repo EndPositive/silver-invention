@@ -25,17 +25,27 @@ const computeMaterializedView = (fromTable,key,value,outTable) => {
   ])
 }
 
-const computeReadsRegion = () => {
-  db.users.createIndex({ uid: 1 });
-  db.reads.createIndex({ uid: 1 });
+const computeReads = () => {
+  db[USERS].createIndex({ uid: 1 });
+  db[ARTICLES].createIndex({ aid: 1 });
+  db[READS].createIndex({ uid: 1 });
+  db[READS].createIndex({ aid: 1 });
 
-  db.reads.aggregate([
+  db[READS].aggregate([
     {
       $lookup:{
-          from: users,
+          from: USERS,
           localField: "uid",
           foreignField: "uid",
           as: "user",
+        },
+    },
+    {
+      $lookup:{
+          from: ARTICLES,
+          localField: "aid",
+          foreignField: "aid",
+          as: "article",
         },
     },
     {
@@ -58,10 +68,26 @@ const computeReadsRegion = () => {
               },
             },
           },
+          category: {
+            $getField: {
+              field: "category",
+              input: {
+                $arrayElemAt: ["$article", 0],
+              },
+            },
+          },
         },
     },
     {
-      $merge:reads,
+      $merge:READS,
+    },
+  ])
+}
+const computeBeReads = () => {
+  db[READS].aggregate([
+    // TODO: ...
+    {
+      $out:BE_READS,
     },
   ])
 }
@@ -89,21 +115,21 @@ granularity.forEach(temporalGranularity => {
     {
       $group: {
         _id: "$period",
-        readCount: {$sum: "$readNum"},
-        commentCount: {$sum: "$commentNum"},
-        agreeCount: {$sum: "$agreeNum"},
-        shareCount: {$sum: "$shareNum"},
+        // readCount: {$sum: "$readNum"},
+        // commentCount: {$sum: "$commentNum"},
+        // agreeCount: {$sum: "$agreeNum"},
+        // shareCount: {$sum: "$shareNum"},
         totalInteractions: {
           $sum: {
             $add: [
-              "$readNum",
-              {$multiply: ["$commentNum", 2]},
-              {$multiply: ["$agreeNum", 3]},
-              {$multiply: ["$shareNum", 4]}
+              {$toInt:"$readNum"},
+              {$toInt:"$commentNum"},
+              {$toInt:"$agreeNum"},
+              {$toInt:"$shareNum"},
             ]
           }
         },
-        aid: {$first: "$aid"}, // the first article id for each period
+        // aid: {$first: "$aid"}, // the first article id for each period
         articleAidList: {$push: "$aid"} // the array of article ids for each period
       }
     },
@@ -193,7 +219,7 @@ const shardByCategory = (table, shardValues) => {
 computeMaterializedView(ARTICLES,"category","science",ARTICLES_SCIENCE);
 computeMaterializedView(BE_READS,"category","science",BE_READS_SCIENCE);
 
-computeReadsRegion();
+computeReads();
 
 shardByRegion(USERS, [
     { shard: SHARD1, value: "Beijing" },
