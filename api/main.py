@@ -74,34 +74,76 @@ async def get_cache(key: str):
 
     return json.loads(result)
 
+def parse_output(output):
+    for r in output:
+        r["id"] = str(r.pop("_id"))
+    return output
 
-@app.get("/get-users")
-async def get_users(background_tasks: BackgroundTasks, id: int | None = None, uid: int | None = None,
-                    name: str | None = None, gender: str | None = None, email: str | None = None,
-                    phone: str | None = None, dept: str | None = None, grade: str | None = None,
-                    language: str | None = None, region: str | None = None, role: str | None = None,
-                    preferTags: str | None = None, obtainedCredits: int | None = None):
-    params = locals()
-    # sort it to make sure the order is the same
-    params = {i: params[i] for i in sorted(params.keys())}
+def build_chache_key(collection,skip,limit,query):
+    cache_components = {
+        'collection': collection.name,  # assuming collection has a 'name' attribute
+        'skip': skip,
+        'limit': limit,
+        'query': query,
+    }
+    
+    cache_key = json.dumps(cache_components, sort_keys=True)
+    return cache_key
 
-    cache_key = json.dumps(params.values())
+async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0, limit: int = 10, query: dict = {}):
+    cache_key = build_chache_key(collection,skip,limit,query)
+
     cached = await get_cache(cache_key)
     if cached:
         return cached
 
-    users_collection = mongo_db["users"]
-    query = {}
-    for k, v in params.items():
-        if v is not None:
-            query[k] = v
-
-    result = await users_collection.find(query).to_list()
+    result = await collection.find(query).skip(skip).limit(limit).to_list(limit)
 
     background_tasks.add_task(set_cache, result, cache_key)
 
-    return result
+    return parse_output(result)
 
+async def get_data_by_query(background_tasks,collection, **kwargs):
+    # Exclude specific variables from the query parameters
+    query = {k: v for k, v in kwargs.items() if v is not None and 'collection' not in k.lower() }
+
+    # Fetch data using the common get_data function
+    return await get_data(background_tasks=background_tasks, collection=collection, query=query)
+
+    
+@app.get("/users")
+async def get_users(background_tasks: BackgroundTasks, region:str | None ):
+    users_collection = mongo_db["users"]
+    return await get_data_by_query(collection=users_collection, ** locals())
+
+@app.get("/articles")
+async def get_articles(background_tasks: BackgroundTasks, skip: int = 0, limit: int = 10):
+    articles_collection = mongo_db["articles"]
+    return await get_data(background_tasks, articles_collection, skip, limit)
+
+@app.get("/user")
+async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, uid: int | None = None,
+                    name: str | None = None, gender: str | None = None, email: str | None = None,
+                    phone: str | None = None, dept: str | None = None, grade: str | None = None,
+                    language: str | None = None, region: str | None = None, role: str | None = None,
+                    preferTags: str | None = None, obtainedCredits: int | None = None):
+    user_collection = mongo_db["users"]
+    return await get_data_by_query(collection=user_collection,**locals())
+
+@app.get("/article")
+async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
+                    timestamp:str | None= None,title: str | None = None, category: str | None = None, 
+                    language: str | None = None):
+    articles_collection = mongo_db["articles"]
+    return await get_data_by_query(collection=articles_collection,**locals())
+
+@app.get("/reads")
+async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
+                    timestamp:str | None= None,title: str | None = None, category: str | None = None, 
+                    language: str | None = None):
+    reads_collection = mongo_db["reads"]
+    return await get_data_by_query(collection=reads_collection,**locals())
+                                   
 
 if __name__ == "__main__":
     import uvicorn
