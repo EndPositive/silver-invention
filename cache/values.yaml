@@ -1,7 +1,7 @@
 architecture: replication
 
 auth:
-  password: "root"
+  enabled: false
 
 master:
   replicaCount: 1
@@ -10,6 +10,9 @@ master:
   ##
   configuration: ""
 
+  persistence:
+    enabled: false
+
 replica:
   replicaCount: 3
   ## @param replica.configuration Configuration for Redis&reg; replicas nodes
@@ -17,6 +20,8 @@ replica:
   ##
   configuration: ""
 
+  persistence:
+    enabled: false
 
 metrics:
   enabled: true

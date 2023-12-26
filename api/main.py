@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 import redis
 from fastapi import BackgroundTasks, FastAPI
+from fastapi.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 import boto3
 from redis import Redis
@@ -11,16 +12,17 @@ from redis import Redis
 UVICORN_HOST = os.environ.get("UVICORN_HOST", "127.0.0.1")
 UVICORN_PORT = os.environ.get("UVICORN_PORT", 8000)
 
-MONGODB_URL = os.environ.get("MONGODB_URL", "mongodb://localhost:27017")
+MONGODB_URL = os.environ.get("MONGODB_URL", "mongodb://root:root@localhost:27017")
 
-REDIS_MASTER_URL = os.environ.get("REDIS_MASTER_URL", "redis://localhost:6379")
-REDIS_REPLICA_URL = os.environ.get("REDIS_REPLICA_URL", "redis://localhost:6379")
+REDIS_MASTER_URL = os.environ.get("REDIS_MASTER_URL", "redis://@localhost:6379/0")
+REDIS_REPLICA_URL = os.environ.get("REDIS_REPLICA_URL", "redis://@localhost:6379/0")
 
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", "http://localhost:9000")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "media")
-S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", "root")
-S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", "root")
+S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", "PASSWORD")
+S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", "USERNAME")
+
 MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "database")
-MONGODB_COLLECTION_NAME = os.environ.get("MONGODB_COLLECTION_NAME", "your_collection")
 
 # Initialize MongoDB client
 mongo_client = AsyncIOMotorClient(MONGODB_URL)
@@ -31,10 +33,13 @@ redis_master: Redis = redis.Redis.from_url(REDIS_MASTER_URL, db=0)
 redis_replica: Redis = redis.Redis.from_url(REDIS_REPLICA_URL, db=0)
 
 # Initialize S3 client from S3 bucket name and URL
-s3 = boto3.resource('s3',
-                    endpoint_url='https://localhost:9000',
-                    aws_access_key_id=S3_ACCESS_KEY_ID,
-                    aws_secret_access_key=S3_SECRET_ACCESS_KEY)
+s3 = boto3.client(
+    's3',
+    endpoint_url=S3_ENDPOINT_URL,
+    aws_access_key_id=S3_ACCESS_KEY_ID,
+    aws_secret_access_key=S3_SECRET_ACCESS_KEY,
+    config=boto3.session.Config(signature_version='s3v4', region_name='us-east-1')
+)
 
 
 @asynccontextmanager
@@ -49,7 +54,7 @@ async def lifespan(app: FastAPI):
     print(redis_replica.ping())
     # test if s3 is connected
     print("waiting for s3 connection...")
-    print(s3.buckets.all())
+    print(s3.list_buckets())
     yield
     redis_master.close()
     redis_replica.close()
@@ -68,30 +73,33 @@ async def set_cache(data, key: str):
 
 
 async def get_cache(key: str):
-    result = await redis_replica.get(key)
+    result = redis_replica.get(key)
     if not result:
         return None
 
     return json.loads(result)
+
 
 def parse_output(output):
     for r in output:
         r["id"] = str(r.pop("_id"))
     return output
 
-def build_chache_key(collection,skip,limit,query):
+
+def build_cache_key(collection, skip, limit, query):
     cache_components = {
         'collection': collection.name,  # assuming collection has a 'name' attribute
         'skip': skip,
         'limit': limit,
         'query': query,
     }
-    
+
     cache_key = json.dumps(cache_components, sort_keys=True)
     return cache_key
 
+
 async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0, limit: int = 10, query: dict = {}):
-    cache_key = build_chache_key(collection,skip,limit,query)
+    cache_key = build_cache_key(collection, skip, limit, query)
 
     cached = await get_cache(cache_key)
     if cached:
@@ -103,46 +111,51 @@ async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0,
 
     return parse_output(result)
 
-async def get_data_by_query(background_tasks,collection, **kwargs):
+
+async def get_data_by_query(background_tasks, collection, **kwargs):
     # Exclude specific variables from the query parameters
-    query = {k: v for k, v in kwargs.items() if v is not None and 'collection' not in k.lower() }
+    query = {k: v for k, v in sorted(kwargs.items()) if v is not None}
 
     # Fetch data using the common get_data function
     return await get_data(background_tasks=background_tasks, collection=collection, query=query)
 
-    
+
+@app.get("/", include_in_schema=False)
+async def docs_redirect():
+    return RedirectResponse(url='/docs')
+
+
 @app.get("/users")
-async def get_users(background_tasks: BackgroundTasks, region:str | None ):
-    users_collection = mongo_db["users"]
-    return await get_data_by_query(collection=users_collection, ** locals())
+async def get_users(background_tasks: BackgroundTasks, region: str | None):
+    return await get_data_by_query(mongo_db["users"], **locals())
+
 
 @app.get("/articles")
 async def get_articles(background_tasks: BackgroundTasks, skip: int = 0, limit: int = 10):
-    articles_collection = mongo_db["articles"]
-    return await get_data(background_tasks, articles_collection, skip, limit)
+    return await get_data(background_tasks, mongo_db["articles"], skip, limit)
+
 
 @app.get("/user")
 async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, uid: int | None = None,
-                    name: str | None = None, gender: str | None = None, email: str | None = None,
-                    phone: str | None = None, dept: str | None = None, grade: str | None = None,
-                    language: str | None = None, region: str | None = None, role: str | None = None,
-                    preferTags: str | None = None, obtainedCredits: int | None = None):
-    user_collection = mongo_db["users"]
-    return await get_data_by_query(collection=user_collection,**locals())
+                      name: str | None = None, gender: str | None = None, email: str | None = None,
+                      phone: str | None = None, dept: str | None = None, grade: str | None = None,
+                      language: str | None = None, region: str | None = None, role: str | None = None,
+                      preferTags: str | None = None, obtainedCredits: int | None = None):
+    return await get_data_by_query(mongo_db["users"], **locals())
+
 
 @app.get("/article")
 async def get_article_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
-                    timestamp:str | None= None,title: str | None = None, category: str | None = None, 
-                    language: str | None = None):
-    articles_collection = mongo_db["articles"]
-    return await get_data_by_query(collection=articles_collection,**locals())
+                         timestamp: str | None = None, title: str | None = None, category: str | None = None,
+                         language: str | None = None):
+    return await get_data_by_query(mongo_db["articles"], **locals())
+
 
 @app.get("/reads")
 async def get_read_by(background_tasks: BackgroundTasks, title: int | None = None,
-                      name: str | None = None,region:str | None= None, category:str | None= None,):
-    reads_collection = mongo_db["reads"]
-    return await get_data_by_query(collection=reads_collection,**locals())
-                                   
+                      name: str | None = None, region: str | None = None, category: str | None = None, ):
+    return await get_data_by_query(mongo_db["reads"], **locals())
+
 
 if __name__ == "__main__":
     import uvicorn
