@@ -45,53 +45,53 @@ const alternateReads = () => {
 
     db[READS].aggregate([
         {
-        $lookup:{
-            from: USERS,
-            localField: "uid",
-            foreignField: "uid",
-            as: "user",
+            $lookup:{
+                from: USERS,
+                localField: "uid",
+                foreignField: "uid",
+                as: "user",
             },
         },
         {
-        $lookup:{
-            from: ARTICLES,
-            localField: "aid",
-            foreignField: "aid",
-            as: "article",
+            $lookup:{
+                from: ARTICLES,
+                localField: "aid",
+                foreignField: "aid",
+                as: "article",
             },
         },
         {
-        $project:{
-            _id: 1,
-            timestamp: 1,
-            id: 1,
-            uid: 1,
-            aid: 1,
-            readTimeLength: 1,
-            agreeOrNot: 1,
-            commentOrNot: 1,
-            shareOrNot: 1,
-            commentDetail: 1,
-            region: {
-                $getField: {
-                field: "region",
-                input: {
-                    $arrayElemAt: ["$user", 0],
+            $project:{
+                _id: 1,
+                timestamp: 1,
+                id: 1,
+                uid: 1,
+                aid: 1,
+                readTimeLength: 1,
+                agreeOrNot: 1,
+                commentOrNot: 1,
+                shareOrNot: 1,
+                commentDetail: 1,
+                region: {
+                    $getField: {
+                        field: "region",
+                        input: {
+                            $arrayElemAt: ["$user", 0],
+                        },
+                    },
                 },
+                category: {
+                    $getField: {
+                        field: "category",
+                        input: {
+                            $arrayElemAt: ["$article", 0],
+                        },
+                    },
                 },
-            },
-            category: {
-                $getField: {
-                field: "category",
-                input: {
-                    $arrayElemAt: ["$article", 0],
-                },
-                },
-            },
             },
         },
         {
-        $merge:READS,
+            $merge:READS,
         },
     ])
 }
@@ -108,61 +108,61 @@ const computeBeReads = () => {
         $group:
         {
             _id: "$aid",
-            timestamp: {$first: "$timestamp"},
-            aid: {$first: "$aid"},
-            category: {$first: "$category"},
+            timestamp: { $first: "$timestamp" },
+            aid: { $first: "$aid" },
+            category: { $first: "$category" },
             readNum: { $sum: { $toInt: "$readTimeLength"}},
             readUidList: {
-            $addToSet: {
-                $cond: {
-                if: {
-                    $eq: ["$readOrNot", "1"],
+                $addToSet: {
+                    $cond: {
+                        if: {
+                            $eq: ["$readOrNot", "1"],
+                        },
+                        then: "$uid",
+                        else: "$REMOVE",
+                    },
                 },
-                then: "$uid",
-                else: "$REMOVE",
-                },
-            },
             },
             commentNum: { $sum: { $toInt: "$commentOrNot"}},
             commentUidList: {
-            $addToSet: {
-                $cond: {
-                if: {
-                    $eq: ["$commentOrNot", "1"],
+                $addToSet: {
+                    $cond: {
+                        if: {
+                            $eq: ["$commentOrNot", "1"],
+                        },
+                        then: "$uid",
+                        else: "$REMOVE",
+                    },
                 },
-                then: "$uid",
-                else: "$REMOVE",
-                },
-            },
             },
             agreeNum: { $sum: { $toInt: "$agreeOrNot"} },
             agreeUidList: {
-            $addToSet: {
-                $cond: {
-                if: {
-                    $eq: ["$agreeOrNot", "1"],
-                },
-                then: "$uid",
-                else: "$REMOVE",
+                $addToSet: {
+                    $cond: {
+                        if: {
+                            $eq: ["$agreeOrNot", "1"],
+                        },
+                        then: "$uid",
+                        else: "$REMOVE",
+                    },
                 },
             },
-            },
-            shareNum: {$sum: { $toInt: "$shareOrNot"}},
+            shareNum: { $sum: { $toInt: "$shareOrNot"} },
             shareUidList: {
-            $addToSet: {
-                $cond: {
-                if: {
-                    $eq: ["$shareOrNot", "1"],
+                $addToSet: {
+                    $cond: {
+                        if: {
+                            $eq: ["$shareOrNot", "1"],
+                        },
+                        then: "$uid",
+                        else: "$REMOVE",
+                    },
                 },
-                then: "$uid",
-                else: "$REMOVE",
-                },
-            },
             },
         }
         },
         {
-        $out:BE_READS,
+            $out:BE_READS,
         },
     ],
     { allowDiskUse: true })
@@ -203,44 +203,44 @@ const computePopularRank = () => {
                 // agreeCount: {$sum: "$agreeNum"},
                 // shareCount: {$sum: "$shareNum"},
                 totalInteractions: {
-                $sum: {
-                    $add: [
-                    "$readNum",
-                    "$commentNum",
-                    "$agreeNum",
-                    "$shareNum",
-                    ]
-                }
+                    $sum: {
+                        $add: [
+                            "$readNum",
+                            "$commentNum",
+                            "$agreeNum",
+                            "$shareNum",
+                        ]
+                    }
                 },
                 // aid: {$first: "$aid"}, // the first article id for each period
-                articleAidList: {$push: "$aid"} // the array of article ids for each period
+                articleAidList: { $push: "$aid" } // the array of article ids for each period
             }
             },
             // Sort the documents by the period field and the totalInteractions field in descending order.
             {
-            $sort: {
-                "_id": 1,
-                "totalInteractions": -1
-            }
+                $sort: {
+                    "_id": 1,
+                    "totalInteractions": -1
+                }
             },
             // Use the $project stage to reshape the output document and extract the relevant fields for the popular rank table.
             {
-            $project: {
-                _id: {$toLong:"$_id"},
-                timestamp: {$toLong:"$_id"},
-                period:"$_id",
-                temporalGranularity: temporalGranularity,
-                articleAidList: 1 // the array of article ids for each period
-            }
+                $project: {
+                    _id: { $toLong:"$_id" },
+                    timestamp: { $toLong:"$_id" },
+                    period:"$_id",
+                    temporalGranularity: temporalGranularity,
+                    articleAidList: 1 // the array of article ids for each period
+                }
             },
             // Use the $merge stage to write the output to the popularRank collection, inserting new documents or replacing existing ones based on the _id.
             {
-            $merge: {
-                into: "popular_rank",
-                on: ["timestamp", "temporalGranularity"],
-                whenMatched: "replace",
-                whenNotMatched: "insert"
-            }
+                $merge: {
+                    into: "popular_rank",
+                    on: ["timestamp", "temporalGranularity"],
+                    whenMatched: "replace",
+                    whenNotMatched: "insert"
+                }
             }
         ])
     })
