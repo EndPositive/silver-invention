@@ -1,15 +1,16 @@
-import { 
-  DB,
-  SHARD1KEY,
-  SHARD2KEY,
-  SHARD1TAG,
-  SHARD2TAG,
-  USERS,
-  ARTICLES,
-  ARTICLES_SCIENCE,
-  READS,BE_READS,
-  BE_READS_SCIENCE,
-  POPULAR_RANK } from "./config"
+import {
+    DB,
+    SHARD1KEY,
+    SHARD2KEY,
+    SHARD1TAG,
+    SHARD2TAG,
+    USERS,
+    ARTICLES,
+    ARTICLES_SCIENCE,
+    READS, BE_READS,
+    BE_READS_SCIENCE,
+    POPULAR_RANK
+} from "./config"
 
 sh.addShardTag(SHARD1KEY, SHARD1TAG);
 sh.addShardTag(SHARD2KEY, SHARD2TAG);
@@ -36,16 +37,16 @@ function changeLastLetter(str) {
     }
 }
 
-const shardByKey = ({table,shardKey,shardValues}) => {
+const shardByKey = ({table, shardKey, shardValues}) => {
     sh.enableSharding(table);
 
-    db[table].createIndex({ [shardKey]: 1 });
+    db[table].createIndex({[shardKey]: 1});
 
-    shardValues.forEach(({ shard, value }) => {
-        sh.addTagRange(`${DB}.${table}`, { [shardKey]: value }, { [shardKey]: changeLastLetter(value) }, shard);
+    shardValues.forEach(({tag, value}) => {
+        sh.addTagRange(`${DB}.${table}`, {[shardKey]: value}, {[shardKey]: changeLastLetter(value)}, tag);
     });
 
-    sh.shardCollection(`${DB}.${table}`, { [shardKey]: 1 });
+    sh.shardCollection(`${DB}.${table}`, {[shardKey]: 1});
 
     // wait forever for the chunks to be distributed
     db[table].getShardDistribution(); // verify chunks distributed on shards
@@ -68,39 +69,39 @@ const shardByCategory = (table, shardValues) => {
 };
 
 shardByRegion(USERS, [
-    { shard: SHARD1, value: "Beijing" },
-    { shard: SHARD2, value: "Hong Kong" },
+    {tag: SHARD1TAG, value: "Beijing"},
+    {tag: SHARD2TAG, value: "Hong Kong"},
 ]);
 
 shardByRegion(READS, [
-    { shard: SHARD1, value: "Beijing" },
-    { shard: SHARD2, value: "Hong Kong" },
+    {tag: SHARD1TAG, value: "Beijing"},
+    {tag: SHARD2TAG, value: "Hong Kong"},
 ]);
 
 shardByCategory(ARTICLES, [
-    { shard: SHARD1, value: "science" },
-    { shard: SHARD2, value: "technology" },
+    {tag: SHARD1TAG, value: "science"},
+    {tag: SHARD2TAG, value: "technology"},
 ]);
 
 shardByCategory(ARTICLES_SCIENCE, [
-    { shard: SHARD1, value: "science" },
+    {tag: SHARD1TAG, value: "science"},
 ]);
 
 shardByCategory(BE_READS, [
-    { shard: SHARD1, value: "science" },
-    { shard: SHARD2, value: "technology" },
+    {tag: SHARD1TAG, value: "science"},
+    {tag: SHARD2TAG, value: "technology"},
 ]);
 
 shardByCategory(BE_READS_SCIENCE, [
-    { shard: SHARD2, value: "technology" },
+    {tag: SHARD2TAG, value: "technology"},
 ]);
 
 shardByKey({
     table: POPULAR_RANK,
     shardKey: "temporalGranularity",
     shardValues: [
-        { shard: SHARD1, value: "daily" },
-        { shard: SHARD2, value: "weekly" },
-        { shard: SHARD2, value: "monthly" },
+        {tag: SHARD1TAG, value: "daily"},
+        {tag: SHARD2TAG, value: "weekly"},
+        {tag: SHARD2TAG, value: "monthly"},
     ],
 });
