@@ -185,10 +185,10 @@ const computePopularRank = () => {
             {
             $set: {
                 period: {
-                $dateTrunc: {
-                    date: "$timestamp",
-                    unit: temporalGranularity
-                }
+                    $dateTrunc: {
+                        date: { $toDate: {$toLong:"$timestamp"} },
+                        unit: temporalGranularity
+                    }
                 }
             }
             },
@@ -226,8 +226,9 @@ const computePopularRank = () => {
             // Use the $project stage to reshape the output document and extract the relevant fields for the popular rank table.
             {
             $project: {
-                _id: 0,
-                timestamp: "$_id",
+                _id: {$toLong:"$_id"},
+                timestamp: {$toLong:"$_id"},
+                period:"$_id",
                 temporalGranularity: temporalGranularity,
                 articleAidList: 1 // the array of article ids for each period
             }
