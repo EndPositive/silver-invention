@@ -131,16 +131,15 @@ async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, 
     return await get_data_by_query(collection=user_collection,**locals())
 
 @app.get("/article")
-async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
+async def get_article_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
                     timestamp:str | None= None,title: str | None = None, category: str | None = None, 
                     language: str | None = None):
     articles_collection = mongo_db["articles"]
     return await get_data_by_query(collection=articles_collection,**locals())
 
 @app.get("/reads")
-async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
-                    timestamp:str | None= None,title: str | None = None, category: str | None = None, 
-                    language: str | None = None):
+async def get_read_by(background_tasks: BackgroundTasks, title: int | None = None,
+                      name: str | None = None,region:str | None= None, category:str | None= None,):
     reads_collection = mongo_db["reads"]
     return await get_data_by_query(collection=reads_collection,**locals())
                                    
