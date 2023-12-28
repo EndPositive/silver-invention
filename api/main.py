@@ -1,12 +1,13 @@
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
+import boto3
 import redis
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
-import boto3
 from redis import Redis
 
 UVICORN_HOST = os.environ.get("UVICORN_HOST", "127.0.0.1")
@@ -65,7 +66,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 async def set_cache(data, key: str):
-    await redis_master.set(
+    return redis_master.set(
         key,
         json.dumps(data),
         ex=120,
@@ -112,12 +113,49 @@ async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0,
     return parse_output(result)
 
 
-async def get_data_by_query(background_tasks, collection, **kwargs):
+async def get_data_by_query(collection, background_tasks: BackgroundTasks, **kwargs):
     # Exclude specific variables from the query parameters
     query = {k: v for k, v in sorted(kwargs.items()) if v is not None}
 
     # Fetch data using the common get_data function
     return await get_data(background_tasks=background_tasks, collection=collection, query=query)
+
+
+def process_articles_response(rows):
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [
+            (executor.submit(
+                s3.get_object,
+                Bucket=S3_BUCKET_NAME,
+                Key=row["text"]
+            ), row)
+            for row in rows
+        ]
+
+        for (future, row) in futures:
+            row["text"] = future.result()["Body"].read().decode("utf-8")
+
+    for row in rows:
+        row["image"] = [
+            s3.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={
+                    "Bucket": S3_BUCKET_NAME,
+                    "Key": image_file_name
+                }
+            )
+            for image_file_name in row["image"].split(",")
+        ]
+
+        row["video"] = s3.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={
+                "Bucket": S3_BUCKET_NAME,
+                "Key": row["video"]
+            }
+        )
+
+    return rows
 
 
 @app.get("/", include_in_schema=False)
@@ -132,7 +170,8 @@ async def get_users(background_tasks: BackgroundTasks, region: str | None):
 
 @app.get("/articles")
 async def get_articles(background_tasks: BackgroundTasks, skip: int = 0, limit: int = 10):
-    return await get_data(background_tasks, mongo_db["articles"], skip, limit)
+    rows = await get_data(background_tasks, mongo_db["articles"], skip, limit)
+    return process_articles_response(rows)
 
 
 @app.get("/user")
@@ -148,7 +187,8 @@ async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, 
 async def get_article_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
                          timestamp: str | None = None, title: str | None = None, category: str | None = None,
                          language: str | None = None):
-    return await get_data_by_query(mongo_db["articles"], **locals())
+    rows = await get_data_by_query(mongo_db["articles"], **locals())
+    return process_articles_response(rows)
 
 
 @app.get("/reads")
