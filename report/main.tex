@@ -1,0 +1,175 @@
+\documentclass{article}
+
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2023
+
+
+% ready for submission
+\usepackage[preprint]{neurips_2023}
+
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2023}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2023}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2023}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}
+\usepackage{amsmath}         % colors
+
+
+\title{Distributed Databases Project}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{
+    Jop Zitman 2023280072\\
+    Department of Computer Science\\
+    Tsinghua University\\
+    Beijing, China \\
+    \texttt{zitmanj10@mails.tsinghua.edu.cn}
+    \And
+    Borislav Pavlov\\
+    Department of Computer Science\\
+    Tsinghua University\\
+    \texttt{}
+}
+
+
+\begin{document}
+
+
+    \maketitle
+
+    \abstract
+
+
+    \section{Problem Background \& Motivation}
+    The main goals of this project are to help us gain deeper insight into the knowledge of the advanced big data management techniques in a distributed environment and to grasp the very big data management technologies and apply them to solve real world problems.
+    For this project, we aim to create a distributed database system that can provide information about articles, and the user that read them.
+    The system should be able to handle large amounts of data, including unstructured data, and should be able to handle a large amount of concurrent users with cached responses.
+    Finally, the systems should be somewhat fault-tolerant.
+
+    In practice, this means that we need some scalable API server to access the data.
+    We need some structured data store, some unstructured data store, and some caching data store.
+    Finally, we may need some solution to monitor these individual components.
+
+
+    \section{Existing Solutions}
+
+
+    \section{Problem Definition}
+    The core of the project is the generated dataset.
+    The dataset consists of a large amount of article texts, images, and videos, and the following tables:
+
+    \begin{itemize}
+        \item \textbf{User}: personal information about the user account, shared by the region of this user.
+        \item \textbf{Article}: information about the article, shared by the category of this article.
+        \item \textbf{Read}: information that relates to the time and interactions of users to articles.
+        \item \textbf{Be-Read}: an aggregation of the \textbf{Read} table, which contains relations to each time the article has been read, agreed, or shared (with counts). Sharded by the category of the article.
+        \item \textbf{Popular-Rank}: the total interactions by different granularity based on the Be-Read table.
+    \end{itemize}
+
+
+    \section{Proposed Solution}
+    For this project, we propose to build the solution using the following technologies.
+
+    \subsection{Docker}
+    Docker is a tool that allows us to deploy applications in containers.
+    A container is a lightweight virtual machine that can be used to deploy applications.
+    Docker allows us to easily deploy applications on different systems, without having to worry about system dependencies.
+
+    \subsection{Kubernetes}
+    Kubernetes is a container orchestration system that can be used to deploy and manage containerized applications.
+    It makes it easy to horizontal scale applications across multiple compute nodes.
+    Kubernetes is a good fit for this project, because it allows us to easily deploy and manage the different components of the system.
+    Kubernetes also allows us to easily scale the system, and to monitor the system.
+    Kubernetes also has a large community, which means that there is a lot of documentation and support available.
+
+    Kubernetes is often provided as a service, such as Cloud Kubernetes Engine (GKE) on Google Cloud, or Elastic Kubernetes Service (EKS) on Amazon Web Services.
+    However, for this project, we will use a self-hosted Kubernetes cluster, using Minikube.
+    This prevents us from making any costs, and allows us to focus on the project itself, instead of the infrastructure.
+
+    \subsection{Helm Charts}
+    When an application consists of more than just a single container, it can be more challenging to deploy the container on Kubernetes.
+    This includes resources like configmaps, secrets, services, network policies, and more.
+    Helm allows us to package all of these resources into a single chart, which can then be deployed on Kubernetes.
+    Application developers often release their own Helm charts.
+    Bitnami is a company that provides a lot of Helm charts for popular applications.
+    These charts are often well maintained, and are a good starting point for deploying applications on Kubernetes.
+    In addition, the charts are consistently structured, allowing for easier maintainability when deploying multiple different applications.
+
+    \subsection{Unstructured Data - S3 (MinIO)}
+    For this project, the initial suggested approach was to use HDFS.
+    HDFS is a distributed file system that is designed to run on commodity hardware.
+    HDFS is a good fit for this project, because it is designed to handle large amounts of data, and is fault-tolerant.
+    However, considering the difficulty of deploying HDFS on Kubernetes, we decided to use a more modern approach.
+    S3 is a cloud storage service that is designed to handle large amounts of data.
+    Most cloud providers offer S3 compatible storage services, for example Google Cloud Storage, or Amazon S3.
+    These services often have built-in backups, and are fault-tolerant.
+
+    MinIO is an open-source S3 compatible storage service that can be deployed on Kubernetes.
+    The license is AGPL, which means that it is free to use, even for commercial purposes.
+    MinIO is easy to deploy on local Kubernetes clusters, and is easy to configure.
+    MinIO has different types of solutions for fault-tolerance:
+    * Server-side bucket replication for synchronizing buckets across MinIO deployments
+    * Client-side bucket replication for synchronizing buckets within a MinIO deployment or other S3 compatible storage services.
+    * Site replication for synchronizing independent MinIO deployments as a cluster of replicas.
+    * Erasure coding for fault-tolerance within a single MinIO deployment across multiple nodes (similar to RAID).
+
+    In our project, we decide to use erasure coding, since it seems the most storage-efficient and scalable solution.
+    We will use the default settings for erasure coding, which is 4 data blocks and 2 parity blocks.
+    This means that we can lose up to 2 nodes, without losing any data.
+
+    \subsection{Structured Data - MongoDB}
+    MongoDB is a document-oriented database that is designed to scale horizontally using sharding and replication.
+    The alternative provided in this project was postgres, however postgres does not support sharding out-of-the-box.
+    Postgres is usually only used with a master-replicas setup.
+
+    MongoDB's aggregation pipelines provide excellent support for generating the Be-Read and Popular-Rank tables.
+
+    \subsection{Caching - Redis}
+    Redis is an in-memory data store that can be used as a database, cache, or message broker.
+    Redis has support for scalable deployment types, such as master-replicas, sentinel, and cluster.
+    For this project, we will use a simple master-replica deployment, since we do not expect too much load on the cache.
+
+    \subsection{API Server - fastapi}
+    FastAPI is a modern web framework for building APIs in Python.
+    We choose Python for this project, due to its fast ecosystem of libraries that we need to communicate to the different data stores.
+    Although some other programming languages (such as Golang) have the same libraries, the ease of programming in Python is a big advantage.
+    FastAPI supports concurrent requests, and we can also scale the API server horizontally using Kubernetes.
+
+    \section{Solution Evaluation}
+
+
+    \section{Conclusion}
+
+    \subsection{Future Work}
+
+\end{document}
+
