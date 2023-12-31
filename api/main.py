@@ -110,7 +110,7 @@ async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0,
 
     background_tasks.add_task(set_cache, result, cache_key)
 
-    return parse_output(result)
+    return result
 
 
 async def get_data_by_query(collection, background_tasks: BackgroundTasks, **kwargs):
@@ -120,6 +120,28 @@ async def get_data_by_query(collection, background_tasks: BackgroundTasks, **kwa
     # Fetch data using the common get_data function
     return await get_data(background_tasks=background_tasks, collection=collection, query=query)
 
+async def join_collections(pipeline, from_collection, local_field, foreign_field, as_field):
+    pipeline.append({
+        "$lookup": {
+            "from": from_collection,
+            "localField": local_field,
+            "foreignField": foreign_field,
+            "as": as_field
+        }
+    })
+
+async def aggregate_pipeline(collection, pipeline, project_fields, skip, limit):
+    stages=[
+        {"$skip": skip},
+        {"$limit": limit}
+    ]
+    if(len(project_fields)>1):
+        stages.append({"$project": project_fields})
+
+    pipeline.extend(stages)
+
+    result_cursor = collection.aggregate(pipeline)
+    return await result_cursor.to_list(limit)
 
 def process_articles_response(rows):
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -164,40 +186,103 @@ async def docs_redirect():
 
 
 @app.get("/users")
-async def get_users(background_tasks: BackgroundTasks, region: str | None):
-    return await get_data_by_query(mongo_db["users"], **locals())
+async def get_users(background_tasks: BackgroundTasks, region: str):
+    result = await get_data_by_query(mongo_db["users"], **locals())
+    return parse_output(result)
 
 
 @app.get("/articles")
 async def get_articles(background_tasks: BackgroundTasks, skip: int = 0, limit: int = 10):
     rows = await get_data(background_tasks, mongo_db["articles"], skip, limit)
-    return process_articles_response(rows)
+    return process_articles_response(parse_output(rows))
 
 
 @app.get("/user")
-async def get_user_by(background_tasks: BackgroundTasks, id: int | None = None, uid: int | None = None,
-                      name: str | None = None, gender: str | None = None, email: str | None = None,
-                      phone: str | None = None, dept: str | None = None, grade: str | None = None,
-                      language: str | None = None, region: str | None = None, role: str | None = None,
-                      preferTags: str | None = None, obtainedCredits: int | None = None):
-    return await get_data_by_query(mongo_db["users"], **locals())
-
+async def get_user_by(background_tasks: BackgroundTasks, id: int = None, uid: int = None,
+                      name: str = None, gender: str = None, email: str = None,
+                      phone: str = None, dept: str = None, grade: str = None,
+                      language: str = None, region: str = None, role: str = None,
+                      preferTags: str = None, obtainedCredits: int = None):
+    result = await get_data_by_query(mongo_db["users"], **locals())
+    return parse_output(result)
 
 @app.get("/article")
-async def get_article_by(background_tasks: BackgroundTasks, id: int | None = None, aid: int | None = None,
-                         timestamp: str | None = None, title: str | None = None, category: str | None = None,
-                         language: str | None = None):
+async def get_article_by(background_tasks: BackgroundTasks, id: int = None, aid: int = None,
+                         timestamp: str = None, title: str = None, category: str = None,
+                         language: str = None):
     rows = await get_data_by_query(mongo_db["articles"], **locals())
-    return process_articles_response(rows)
+    return process_articles_response(parse_output(rows))
+
+async def get_reads_collection(collection, params):
+    reads_collection = collection
+    pipeline = [{"$match": {}}]
+
+    if "region" in params and params["region"]:
+        pipeline[0]["$match"]["region"] = params["region"]
+
+    if "category" in params and params["category"]:
+        pipeline[0]["$match"]["category"] = params["category"]
+
+    return reads_collection, pipeline
+
+@app.get("/be-read")
+async def get_article_by(background_tasks: BackgroundTasks,
+                        aid: int = None, category: str = None,
+                        skip: int = 0, limit: int = 10):
+    params = locals()
+
+    bereads_collection, pipeline = await get_reads_collection(mongo_db["be-read"],params)
+    
+    project_fields = {
+        "readNum":1,
+        "commentNum":1,
+        "agreeNum":1,
+        "shareNum":1
+    }
+
+    if aid:
+        await join_collections(pipeline, "articles", "aid", "aid", "article")
+        project_fields["title"] = "$article.title"
+        project_fields["abstract"] = "$article.abstract"
+        project_fields["text"] = "$article.text"
+        project_fields["image"] = "$article.image"
+        project_fields["video"] = "$article.video"
+        pipeline.append({"$unwind": {"path": "$article"}})
+
+    rows = await aggregate_pipeline(bereads_collection,pipeline,project_fields,skip,limit)
+    return process_articles_response(parse_output(rows))
 
 
 @app.get("/reads")
-async def get_read_by(background_tasks: BackgroundTasks, title: int | None = None,
-                      name: str | None = None, region: str | None = None, category: str | None = None, ):
-    return await get_data_by_query(mongo_db["reads"], **locals())
+async def get_read_by(background_tasks: BackgroundTasks,
+                      region: str = None, category: str = None,
+                      email: str = None, title: str = None,
+                      skip: int = 0, limit: int = 10):
+    params = locals()
 
+    reads_collection, pipeline = await get_reads_collection(mongo_db["reads"],params)
+
+    project_fields = {}
+
+    if email:
+        await join_collections(pipeline, "users", "uid", "uid", "user")
+        project_fields["user.name"] = 1
+        project_fields["user.email"] = 1
+        pipeline.append({"$unwind": {"path": "$user"}})
+        pipeline.append({"$match": {"user.email": email}})
+
+    if title:
+        await join_collections(pipeline, "articles", "aid", "aid", "article")
+        project_fields["article.title"] = 1
+        project_fields["article.abstract"] = 1
+        pipeline.append({"$unwind": {"path": "$article"}})
+        pipeline.append({"$match": {"article.title": title}})
+
+    project_fields = {"_id": 0, "readTimeLength": 1, "agreeOrNot": 1, "commentOrNot": 1, "shareOrNot": 1, **project_fields}
+    
+    return await aggregate_pipeline(reads_collection,pipeline,project_fields,skip,limit)
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host=UVICORN_HOST, port=UVICORN_PORT)
+    uvicorn.run(app, host="localhost", port=8088)
