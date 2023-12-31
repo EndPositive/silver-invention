@@ -181,7 +181,7 @@
 
     \begin{itemize}
         \item \textbf{Kubernetes on Minikube:} Minikube is used to deploy a Kubernetes cluster on a local machine. This will allow us to test and develop our system in a local environment before deploying it to a cloud provider.
-        \item \textbf{Monitoring Tools:} Prometheus operator with default Grafana and Alertmanager.
+        \item \textbf{Monitoring Tools:} Prometheus operator with default Grafana and AlertManager.
         \item \textbf{Minio S3 Storage:} Default MinIO provided chart configured with 4 nodes, each with 2 drives, and service-monitors for Prometheus.
         \item \textbf{MongoDB:} Bitnami provided chart configured with a cluster of 3 config servers, 3 mongos routers, and 2 shards, each with 3 replicas. It includes prometheus pod monitors too.
         \item \textbf{Redis:} Deployed with 1 master and 3 replicas without persistence and with service and pod monitors included.
@@ -233,10 +233,20 @@
 
     \subsection{Application Configuration}
 
+    \subsubsection{MinIO}
+    In the MinIO helm chart values file, MinIO is initialized with a bucket called media, without any versioning, object-locking, or any manual replication settings.
+    A set of default credentials is used.
+
+    We've provided a script in s3-seed, in which all article text, videos, and images are bulk uploaded to the media bucket.
+
     \subsubsection{MongoDB}
+    %TODO: boris
 
+    \subsubsection{Redis}
+    Redis does not require any configuration, we can use the deployment as is in our Python API.
 
-    %TODO: Delve deeper into how these technologies interrelate and collectively contribute to a cohesive, scalable, and efficient system.
+    \subsubsection{Python API}
+    %TODO: explain how our API works
 
     \section{Evaluation and Metrics}
     %TODO: Define the performance, scalability, and fault tolerance metrics. Discuss the evaluation methods, including simulation, real-world testing, and user feedback.
