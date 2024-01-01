@@ -1,15 +1,17 @@
-import {USERS, ARTICLES, ARTICLES_SCIENCE, READS, BE_READS, BE_READS_SCIENCE, POPULAR_RANK} from "./config"
+const DB = "database",
+    SHARD1TAG = "DBMS1",
+    SHARD2TAG = "DBMS2",
+    SHARD1KEY = 'mongodb-mongodb-sharded-shard-0',
+    SHARD2KEY = 'mongodb-mongodb-sharded-shard-1',
+    USERS = "users",
+    ARTICLES = "articles",
+    ARTICLES_SCIENCE = "articles_science",
+    READS = "reads",
+    BE_READS = "beReads",
+    BE_READS_SCIENCE = "be_reads_science",
+    POPULAR_RANK = "popular_rank";
 
-const collections = db.listCollections().toArray();
-const collectionExists = (collectionName) => collections.some(collection => collection.name === collectionName);
-
-const COLLECTIONS = [USERS, ARTICLES, ARTICLES_SCIENCE, READS, BE_READS, BE_READS_SCIENCE, POPULAR_RANK]
-
-COLLECTIONS.forEach(collection => {
-    if (!collectionExists(collection)) {
-        db.createCollection(collection)
-    }
-});
+db = db.getSiblingDB('database');
 
 /**
  * Responsible for filtering out a table by a property and storing the reuslt in another table
@@ -181,7 +183,7 @@ const computePopularRank = () => {
     granularity.forEach(temporalGranularity => {
         // Use the $dateTrunc operator to truncate the timestamp field of the be-read table according to the temporal granularity value.
         // This will create a new field that represents the start of the period for each document.
-        db.beRead.aggregate([
+        db[BE_READS].aggregate([
             {
                 $set: {
                     period: {
@@ -237,17 +239,12 @@ const computePopularRank = () => {
             {
                 $merge: {
                     into: "popular_rank",
-                    on: ["timestamp", "temporalGranularity"],
-                    whenMatched: "replace",
-                    whenNotMatched: "insert"
                 }
             }
         ])
     })
 
 }
-
-// TODO: Add script for populating the data
 
 computeMaterializedView(ARTICLES, "category", "science", ARTICLES_SCIENCE);
 computeMaterializedView(BE_READS, "category", "science", BE_READS_SCIENCE);

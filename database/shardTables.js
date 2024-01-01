@@ -1,16 +1,17 @@
-import {
-    DB,
-    SHARD1KEY,
-    SHARD2KEY,
-    SHARD1TAG,
-    SHARD2TAG,
-    USERS,
-    ARTICLES,
-    ARTICLES_SCIENCE,
-    READS, BE_READS,
-    BE_READS_SCIENCE,
-    POPULAR_RANK
-} from "./config"
+const DB = "database",
+    SHARD1TAG = "DBMS1",
+    SHARD2TAG = "DBMS2",
+    SHARD1KEY = 'mongodb-mongodb-sharded-shard-0',
+    SHARD2KEY = 'mongodb-mongodb-sharded-shard-1',
+    USERS = "users",
+    ARTICLES = "articles",
+    ARTICLES_SCIENCE = "articles_science",
+    READS = "reads",
+    BE_READS = "beReads",
+    BE_READS_SCIENCE = "be_reads_science",
+    POPULAR_RANK = "popular_rank";
+
+db = db.getSiblingDB('database');
 
 sh.addShardTag(SHARD1KEY, SHARD1TAG);
 sh.addShardTag(SHARD2KEY, SHARD2TAG);
