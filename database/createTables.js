@@ -40,6 +40,7 @@ const computeMaterializedView = (fromTable, key, value, outTable) => {
  * The $category is needed for computing the BE-READS table
  */
 const alternateReads = () => {
+    db[USERS].createIndex({id: 1});
     db[USERS].createIndex({uid: 1});
     db[ARTICLES].createIndex({aid: 1});
     db[READS].createIndex({uid: 1});
