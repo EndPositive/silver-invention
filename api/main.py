@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import boto3
 import redis
 from fastapi import BackgroundTasks, FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from redis import Redis
 
@@ -83,7 +83,8 @@ async def get_cache(key: str):
 
 def parse_output(output):
     for r in output:
-        r["id"] = str(r.pop("_id"))
+        if "_id" in r:
+            r["id"] = str(r.pop("_id"))
     return output
 
 
@@ -99,28 +100,44 @@ def build_cache_key(collection, skip, limit, query):
     return cache_key
 
 
-async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0, limit: int = 10, query: dict = {}):
+async def get_cached_data(collection, skip, limit, query) -> (dict, bool):
     cache_key = build_cache_key(collection, skip, limit, query)
 
     cached = await get_cache(cache_key)
     if cached:
-        return cached
+        return cached, True
 
-    result = await collection.find(query).skip(skip).limit(limit).to_list(limit)
+    return {}, False
+
+
+def set_cached_data(background_tasks: BackgroundTasks, collection, skip, limit, query, result):
+    cache_key = build_cache_key(collection, skip, limit, query)
 
     background_tasks.add_task(set_cache, result, cache_key)
 
-    return result
+
+async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0, limit: int = 10, query: dict = {}) -> (
+        dict, bool):
+    result, cached = await get_cached_data(collection, skip, limit, query)
+    if cached:
+        return result, cached
+
+    result = await collection.find(query).skip(skip).limit(limit).to_list(limit)
+
+    set_cached_data(background_tasks, collection, skip, limit, query, result)
+
+    return result, False
 
 
-async def get_data_by_query(collection, background_tasks: BackgroundTasks, **kwargs):
+async def get_data_by_query(collection, skip, limit, background_tasks: BackgroundTasks, **kwargs) -> (dict, bool):
     # Exclude specific variables from the query parameters
     query = {k: v for k, v in sorted(kwargs.items()) if v is not None}
 
     # Fetch data using the common get_data function
-    return await get_data(background_tasks=background_tasks, collection=collection, query=query)
+    return await get_data(background_tasks=background_tasks, collection=collection, query=query, skip=skip, limit=limit)
 
-async def join_collections(pipeline, from_collection, local_field, foreign_field, as_field):
+
+def join_collections(pipeline, from_collection, local_field, foreign_field, as_field, match_key, match_value):
     pipeline.append({
         "$lookup": {
             "from": from_collection,
@@ -130,18 +147,20 @@ async def join_collections(pipeline, from_collection, local_field, foreign_field
         }
     })
 
+
 async def aggregate_pipeline(collection, pipeline, project_fields, skip, limit):
-    stages=[
+    stages = [
         {"$skip": skip},
         {"$limit": limit}
     ]
-    if(len(project_fields)>1):
+    if (len(project_fields) > 1):
         stages.append({"$project": project_fields})
 
     pipeline.extend(stages)
 
     result_cursor = collection.aggregate(pipeline)
     return await result_cursor.to_list(limit)
+
 
 def process_articles_response(rows):
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -166,16 +185,17 @@ def process_articles_response(rows):
                     "Key": image_file_name
                 }
             )
-            for image_file_name in row["image"].split(",")
+            for image_file_name in row["image"].split(",") if image_file_name
         ]
 
-        row["video"] = s3.generate_presigned_url(
-            ClientMethod="get_object",
-            Params={
-                "Bucket": S3_BUCKET_NAME,
-                "Key": row["video"]
-            }
-        )
+        if row["video"]:
+            row["video"] = s3.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={
+                    "Bucket": S3_BUCKET_NAME,
+                    "Key": row["video"]
+                }
+            )
 
     return rows
 
@@ -186,32 +206,26 @@ async def docs_redirect():
 
 
 @app.get("/users")
-async def get_users(background_tasks: BackgroundTasks, region: str):
-    result = await get_data_by_query(mongo_db["users"], **locals())
-    return parse_output(result)
-
-
-@app.get("/articles")
-async def get_articles(background_tasks: BackgroundTasks, skip: int = 0, limit: int = 10):
-    rows = await get_data(background_tasks, mongo_db["articles"], skip, limit)
-    return process_articles_response(parse_output(rows))
-
-
-@app.get("/user")
 async def get_user_by(background_tasks: BackgroundTasks, id: int = None, uid: int = None,
                       name: str = None, gender: str = None, email: str = None,
                       phone: str = None, dept: str = None, grade: str = None,
                       language: str = None, region: str = None, role: str = None,
-                      preferTags: str = None, obtainedCredits: int = None):
-    result = await get_data_by_query(mongo_db["users"], **locals())
-    return parse_output(result)
+                      preferTags: str = None, obtainedCredits: int = None, skip: int = 0, limit: int = 10):
+    result, cached = await get_data_by_query(mongo_db["users"], **locals())
+    return JSONResponse(content=parse_output(result), headers={"X-Cache": "Hit" if cached else "Miss"})
 
-@app.get("/article")
+
+@app.get("/articles")
 async def get_article_by(background_tasks: BackgroundTasks, id: int = None, aid: int = None,
                          timestamp: str = None, title: str = None, category: str = None,
-                         language: str = None):
-    rows = await get_data_by_query(mongo_db["articles"], **locals())
-    return process_articles_response(parse_output(rows))
+                         language: str = None, skip: int = 0, limit: int = 10):
+    rows, cached = await get_data_by_query(mongo_db["articles"], **locals())
+    if not cached:
+        rows = process_articles_response(parse_output(rows))
+
+    return JSONResponse(content=rows,
+                        headers={"X-Cache": "Hit" if cached else "Miss"})
+
 
 async def get_reads_collection(collection, params):
     reads_collection = collection
@@ -225,62 +239,97 @@ async def get_reads_collection(collection, params):
 
     return reads_collection, pipeline
 
-@app.get("/be-read")
-async def get_article_by(background_tasks: BackgroundTasks,
-                        aid: int = None, category: str = None,
-                        skip: int = 0, limit: int = 10):
-    params = locals()
 
-    bereads_collection, pipeline = await get_reads_collection(mongo_db["be-read"],params)
-    
+@app.get("/be-read")
+async def get_be_read_by(background_tasks: BackgroundTasks,
+                         aid: int = None, category: str = None,
+                         skip: int = 0, limit: int = 10):
+    rows, cached = await get_cached_data(mongo_db["beReads"], skip, limit, "aggregation")
+    if cached:
+        return JSONResponse(content=rows, headers={"X-Cache": "Hit"})
+
+    bereads_collection, pipeline = await get_reads_collection(mongo_db["beReads"], locals())
+
     project_fields = {
-        "readNum":1,
-        "commentNum":1,
-        "agreeNum":1,
-        "shareNum":1
+        "readNum": 1,
+        "commentNum": 1,
+        "agreeNum": 1,
+        "shareNum": 1
     }
 
-    if aid:
-        await join_collections(pipeline, "articles", "aid", "aid", "article")
-        project_fields["title"] = "$article.title"
-        project_fields["abstract"] = "$article.abstract"
-        project_fields["text"] = "$article.text"
-        project_fields["image"] = "$article.image"
-        project_fields["video"] = "$article.video"
-        pipeline.append({"$unwind": {"path": "$article"}})
+    join_collections(pipeline, "articles", "aid", "aid", "article")
+    project_fields["article.id"] = 1
+    project_fields["article.title"] = 1
+    project_fields["article.category"] = 1
+    project_fields["article.abstract"] = 1
+    project_fields["article.articleTags"] = 1
+    project_fields["article.authors"] = 1
+    project_fields["article.language"] = 1
+    project_fields["article.text"] = 1
+    project_fields["article.image"] = 1
+    project_fields["article.video"] = 1
+    pipeline.append({"$unwind": {"path": "$article"}})
 
-    rows = await aggregate_pipeline(bereads_collection,pipeline,project_fields,skip,limit)
-    return process_articles_response(parse_output(rows))
+    rows = await aggregate_pipeline(bereads_collection, pipeline, project_fields, skip, limit)
+
+    for row in rows:
+        row["article"] = process_articles_response(parse_output([row["article"]]))[0]
+
+    set_cached_data(background_tasks, mongo_db["beReads"], skip, limit, "aggregation", rows)
+
+    return JSONResponse(content=rows, headers={"X-Cache": "Miss"})
 
 
 @app.get("/reads")
 async def get_read_by(background_tasks: BackgroundTasks,
-                      region: str = None, category: str = None,
-                      email: str = None, title: str = None,
-                      skip: int = 0, limit: int = 10):
-    params = locals()
+                      user_id: str = None, skip: int = 0, limit: int = 10):
+    rows, cached = await get_cached_data(mongo_db["reads"], skip, limit, [user_id])
+    if cached:
+        return JSONResponse(content=rows, headers={"X-Cache": "Hit"})
 
-    reads_collection, pipeline = await get_reads_collection(mongo_db["reads"],params)
+    reads_collection, pipeline = await get_reads_collection(mongo_db["reads"], locals())
 
     project_fields = {}
 
-    if email:
-        await join_collections(pipeline, "users", "uid", "uid", "user")
-        project_fields["user.name"] = 1
-        project_fields["user.email"] = 1
-        pipeline.append({"$unwind": {"path": "$user"}})
-        pipeline.append({"$match": {"user.email": email}})
+    join_collections(pipeline, "users", "uid", "uid", "user", "id", user_id)
+    project_fields["user.id"] = 1
+    project_fields["user.name"] = 1
+    project_fields["user.gender"] = 1
+    project_fields["user.email"] = 1
+    project_fields["user.phone"] = 1
+    project_fields["user.grade"] = 1
+    project_fields["user.language"] = 1
+    project_fields["user.role"] = 1
+    project_fields["user.preferTags"] = 1
+    project_fields["user.obtainedCredits"] = 1
+    pipeline.append({"$unwind": {"path": "$user"}})
+    pipeline.append({"$match": {"user.id": user_id}})
 
-    if title:
-        await join_collections(pipeline, "articles", "aid", "aid", "article")
-        project_fields["article.title"] = 1
-        project_fields["article.abstract"] = 1
-        pipeline.append({"$unwind": {"path": "$article"}})
-        pipeline.append({"$match": {"article.title": title}})
+    join_collections(pipeline, "articles", "aid", "aid", "article", "", "")
+    project_fields["article.id"] = 1
+    project_fields["article.title"] = 1
+    project_fields["article.category"] = 1
+    project_fields["article.abstract"] = 1
+    project_fields["article.articleTags"] = 1
+    project_fields["article.authors"] = 1
+    project_fields["article.language"] = 1
+    project_fields["article.text"] = 1
+    project_fields["article.image"] = 1
+    project_fields["article.video"] = 1
+    pipeline.append({"$unwind": {"path": "$article"}})
 
-    project_fields = {"_id": 0, "readTimeLength": 1, "agreeOrNot": 1, "commentOrNot": 1, "shareOrNot": 1, **project_fields}
-    
-    return await aggregate_pipeline(reads_collection,pipeline,project_fields,skip,limit)
+    project_fields = {"_id": 0, "readTimeLength": 1, "agreeOrNot": 1, "commentOrNot": 1, "shareOrNot": 1,
+                      **project_fields}
+
+    rows = await aggregate_pipeline(reads_collection, pipeline, project_fields, skip, limit)
+
+    for row in rows:
+        row["article"] = process_articles_response(parse_output([row["article"]]))[0]
+
+    set_cached_data(background_tasks, mongo_db["reads"], skip, limit, "aggregation", rows)
+
+    return JSONResponse(content=rows, headers={"X-Cache": "Miss"})
+
 
 if __name__ == "__main__":
     import uvicorn
