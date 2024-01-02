@@ -124,6 +124,10 @@ async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0,
 
     result = await collection.find(query).skip(skip).limit(limit).to_list(limit)
 
+    for row in result:
+        if "period" in row:
+            del row["period"]
+
     set_cached_data(background_tasks, collection, skip, limit, query, result)
 
     return result, False
@@ -280,13 +284,16 @@ async def get_be_read_by(background_tasks: BackgroundTasks,
     return JSONResponse(content=rows, headers={"X-Cache": "Miss"})
 
 @app.get("/popular")
-async def get_article_by(background_tasks: BackgroundTasks, 
+async def get_popular(background_tasks: BackgroundTasks,
                          temporalGranularity: str = None, timestamp: int = 1506988800000):
-    popular = await get_data_by_query(mongo_db["popular-rank"],**locals())
-    articleIds = popular[0]['articleAidList'][:5]
-    query = {"aid":{"$in":articleIds}} 
-    rows = await get_data(background_tasks,mongo_db["articles"],query=query)
-    return process_articles_response(parse_output(rows))
+    popular = await get_data_by_query(mongo_db["popular_rank"], skip=0, limit=5, **locals())
+    articleIds = popular[0][0]['articleAidList'][:5]
+    query = {"aid": {"$in": articleIds}}
+    rows, cached = await get_data(background_tasks, mongo_db["articles"], query=query)
+    if cached:
+        return JSONResponse(content=rows, headers={"X-Cache": "Hit"})
+
+    return JSONResponse(content=process_articles_response(parse_output(rows)), headers={"X-Cache": "Miss"})
 
 @app.get("/reads")
 async def get_read_by(background_tasks: BackgroundTasks,
