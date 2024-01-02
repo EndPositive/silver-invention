@@ -279,6 +279,14 @@ async def get_be_read_by(background_tasks: BackgroundTasks,
 
     return JSONResponse(content=rows, headers={"X-Cache": "Miss"})
 
+@app.get("/popular")
+async def get_article_by(background_tasks: BackgroundTasks, 
+                         temporalGranularity: str = None, timestamp: int = 1506988800000):
+    popular = await get_data_by_query(mongo_db["popular-rank"],**locals())
+    articleIds = popular[0]['articleAidList'][:5]
+    query = {"aid":{"$in":articleIds}} 
+    rows = await get_data(background_tasks,mongo_db["articles"],query=query)
+    return process_articles_response(parse_output(rows))
 
 @app.get("/reads")
 async def get_read_by(background_tasks: BackgroundTasks,
