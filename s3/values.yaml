@@ -120,7 +120,7 @@ metrics:
       # metricRelabelings:
       #   - regex: (server|pod)
     #     action: labeldrop
-    namespace: ~
+    namespace: monitoring
     # Scrape interval, for example `interval: 30s`
     interval: ~
     # Scrape timeout, for example `scrapeTimeout: 10s`
