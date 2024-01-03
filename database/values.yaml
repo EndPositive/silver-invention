@@ -28,4 +28,4 @@ metrics:
   enabled: true
   podMonitor:
     enabled: true
-    namespace: mongodb
+    namespace: monitoring

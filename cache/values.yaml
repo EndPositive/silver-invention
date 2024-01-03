@@ -27,5 +27,7 @@ metrics:
   enabled: true
   serviceMonitor:
     enabled: true
+    namespace: monitoring
   podMonitor:
     enabled: true
+    namespace: monitoring
