@@ -1,2 +1,7 @@
 db-generation
 .idea
+out/*.aux
+out/*.log
+out/*.out
+out/*.synctex.gz
+out/*.toc
