@@ -13,6 +13,7 @@
 \usepackage{listings}
 \usepackage{graphicx}
 \usepackage{multirow}
+\usepackage{tabularx}
 
 \title{Distributed Databases Project}
 
@@ -69,7 +70,7 @@
 
     \begin{figure}[h]
         \centering
-        \includegraphics[width=5cm]{images/reference-entity-relation-diagram}
+        \includegraphics[width=0.5\textwidth]{images/reference-entity-relation-diagram}
         \caption{Reference Entity Relation Diagram}
         \label{fig:reference-entity-relation-diagram}
     \end{figure}
@@ -96,7 +97,7 @@
 
     \begin{figure}[h]
         \centering
-        \includegraphics[width=10cm]{images/reference-architecture}
+        \includegraphics[width=\textwidth]{images/reference-architecture}
         \caption{Reference Infrastructure Architecture}
         \label{fig:reference-infrastructure-architecture}
     \end{figure}
@@ -186,7 +187,7 @@
 
     \begin{figure}[h]
         \centering
-        \includegraphics[width=11cm]{images/architecture}
+        \includegraphics[width=\textwidth]{images/architecture}
         \caption{Solution Infrastructure}
         \label{fig:cluster}
     \end{figure}
@@ -231,31 +232,26 @@
 
     \begin{table}[h]
         \centering
-        \begin{tabular}{|c|c|p{8cm}|}
+        \begin{tabularx}{\textwidth}{|c|c|X|}
             \hline
             \textbf{Table Name} & \textbf{Shard} & \textbf{Criteria} \\
             \hline
-            \multirow{2}{*}{User} & Shard1 & Region = "Beijing" \\
-            \cline{2-3}
+            User & Shard1 & Region = "Beijing" \\
             & Shard2 & Region = "Hong Kong" \\
             \hline
-            \multirow{2}{*}{Article} & Shard1 & Category = "Science" \\
-            \cline{2-3}
+            Article & Shard1 & Category = "Science" \\
             & Shard2 & Category = "Science" and "Technology" \\
             \hline
-            \multirow{2}{*}{Read} & Shard1 & Region = "Beijing" \\
-            \cline{2-3}
+            Read & Shard1 & Region = "Beijing" \\
             & Shard2 & Region = "Hong Kong" \\
             \hline
-            \multirow{2}{*}{Be-Read} & Shard1 & Category = "Science" \\
-            \cline{2-3}
+            Be-Read & Shard1 & Category = "Science" \\
             & Shard2 & Category = "Science" and "Technology" \\
             \hline
-            \multirow{2}{*}{Popular-Rank} & Shard1 & Temporal Granularity = "day" \\
-            \cline{2-3}
+            Popular-Rank & Shard1 & Temporal Granularity = "day" \\
             & Shard2 & Temporal Granularity = "week | month" \\
             \hline
-        \end{tabular}
+        \end{tabularx}
         \caption{Table Sharing Criteria}
         \label{tab:table-sharing}
     \end{table}
