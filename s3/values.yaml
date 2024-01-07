@@ -1,78 +1,27 @@
 ## minio mode, i.e. standalone or distributed
 mode: distributed
 
-## Internal port number for MinIO S3 API container
-## Change service.port to change external port number
-minioAPIPort: "9000"
-
-## Internal port number for MinIO Browser Console container
-## Change consoleService.port to change external port number
-minioConsolePort: "9001"
-
-## Set default rootUser, rootPassword
-## AccessKey and secretKey is generated when not set
-## Distributed MinIO ref: https://min.io/docs/minio/linux/operations/install-deploy-manage/deploy-minio-multi-node-multi-drive.html
-##
 rootUser: "USERNAME"
 rootPassword: "PASSWORD"
 
 # Number of drives attached to a node
 drivesPerNode: 2
 # Number of MinIO containers running
-replicas: 4
+replicas: 8
 # Number of expanded MinIO clusters
 pools: 1
 
 ## Enable persistence using Persistent Volume Claims
-## ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
-##
 persistence:
   enabled: true
-  annotations: {}
-  
-  ## A manually managed Persistent Volume and Claim
-  ## Requires persistence.enabled: true
-  ## If defined, PVC must be created manually before volume will be bound
-  existingClaim: ""
-  
-  ## minio data Persistent Volume Storage Class
-  ## If defined, storageClassName: <storageClass>
-  ## If set to "-", storageClassName: "", which disables dynamic provisioning
-  ## If undefined (the default) or set to null, no storageClassName spec is
-  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-  ##   GKE, AWS & OpenStack)
-  ##
-  ## Storage class of PV to bind. By default it looks for standard storage class.
-  ## If the PV uses a different storage class, specify that here.
-  storageClass: ""
-  volumeName: ""
-  accessMode: ReadWriteOnce
-  size: 500Gi
-  
-  ## If subPath is set mount a sub folder of a volume instead of the root of the volume.
-  ## This is especially handy for volume plugins that don't natively support sub mounting (like glusterfs).
-  ##
-  subPath: ""
 
-## Node labels for pod assignment
-## Ref: https://kubernetes.io/docs/user-guide/node-selection/
-##
-nodeSelector: {}
-tolerations: []
-affinity: {}
-topologySpreadConstraints: []
-
-## Configure resource requests and limits
-## ref: http://kubernetes.io/docs/user-guide/compute-resources/
-##
 resources:
   requests:
-    memory: 200Mi
+    memory: 100Mi
 
 users: []
 
 ## List of buckets to be created after minio install
-##
 buckets:
   - name: media
     policy: none
@@ -83,19 +32,9 @@ buckets:
 ## Use this field to add environment variables relevant to MinIO server. These fields will be passed on to MinIO container(s)
 ## when Chart is deployed
 environment:
-  MINIO_STORAGE_CLASS_STANDARD: EC:4
+  MINIO_STORAGE_CLASS_STANDARD: EC:8
   MINIO_PROMETHEUS_URL: http://prometheus-k8s.monitoring.svc.cluster.local:9090
   MINIO_PROMETHEUS_JOB_ID: minio
-## Please refer for comprehensive list https://min.io/docs/minio/linux/reference/minio-server/minio-server.html
-## MINIO_SUBNET_LICENSE: "License key obtained from https://subnet.min.io"
-## MINIO_BROWSER: "off"
-
-## PodDisruptionBudget settings
-## ref: https://kubernetes.io/docs/concepts/workloads/pods/disruptions/
-##
-podDisruptionBudget:
-  enabled: true
-  maxUnavailable: 2
 
 ## Specify the service account to use for the MinIO pods. If 'create' is set to 'false'
 ## and 'name' is left unspecified, the account 'default' will be used.

@@ -1,27 +1,4 @@
-\documentclass{article}
-
-
-% if you need to pass options to natbib, use, e.g.:
-%     \PassOptionsToPackage{numbers, compress}{natbib}
-% before loading neurips_2023
-
-
-% ready for submission
-\usepackage[preprint]{neurips_2023}
-
-
-% to compile a preprint version, e.g., for submission to arXiv, add add the
-% [preprint] option:
-%     \usepackage[preprint]{neurips_2023}
-
-
-% to compile a camera-ready version, add the [final] option, e.g.:
-%     \usepackage[final]{neurips_2023}
-
-
-% to avoid loading the natbib package, add option nonatbib:
-%    \usepackage[nonatbib]{neurips_2023}
-
+\documentclass{report}
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
@@ -33,20 +10,11 @@
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}
 \usepackage{amsmath}         % colors
-\usepackage{tikz}
-\usetikzlibrary{backgrounds, positioning, fit}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{multirow}
 
 \title{Distributed Databases Project}
-
-
-% The \author macro works with any number of authors. There are two commands
-% used to separate the names and addresses of multiple authors: \And and \AND.
-%
-% Using \And between authors leaves it to LaTeX to determine where to break the
-% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
-% authors names on the first line, and the last on the second line, try using
-% \AND instead of \And before the third author name.
-
 
 \author{
     Jop Zitman 2023280072\\
@@ -54,7 +22,7 @@
     Tsinghua University\\
     Beijing, China \\
     \texttt{zitmanj10@mails.tsinghua.edu.cn}
-    \And
+    \and
     Borislav Pavlov\\
     Department of Computer Science\\
     Tsinghua University\\
@@ -70,6 +38,7 @@
         % TODO: Compose a concise abstract summarizing the document's content.
     \end{abstract}
 
+    \tableofcontents
 
     \section{Introduction and Motivation}
     The advent of distributed systems has revolutionized the way data is stored, accessed, and processed. As the digital universe expands exponentially, there is an incessant demand for systems that can handle vast and varied data types efficiently. This project seeks to address these needs by developing a distributed database system tailored to manage an extensive array of articles and user interactions. The envisioned system is not only required to handle high volumes of both structured and unstructured data but also ensure that data retrieval is both swift and reliable, accommodating a significant number of concurrent users. Furthermore, the system's architecture should be robust enough to maintain functionality even in the face of certain system failures, thereby ensuring a degree of fault tolerance crucial for maintaining service continuity.
@@ -84,78 +53,98 @@
 
 
     \section{Problem Statement}
-    Central to our investigation is a meticulously generated dataset, which includes a wide variety of article contents such as texts, images, and videos. The system's capability to handle and process this data is contingent upon several foundational tables, each serving a distinct but interconnected function:
+    Central in our investigation is the generated dataset for a news site. The generated data includes a number of \textbf{articles} with their text, image, and/or video content. In addition, the \textbf{user} accounts and the articles which they \textbf{read} are provided. Besided the generated data, requirements also include the need of generating article metrics and popularity rankings. The entire database schemas can be found in the Appendix.
+    Summarized, this gives us the following tables:
+    %TODO: add schemas to appendix
 
     \begin{itemize}
-        \item \textbf{User}: This table is essential for capturing personal information about users, delineated by regional demographics. By understanding user profiles, the system can provide tailored content and improve user experience.
-        \item \textbf{Article}: Articles form the core of the content being managed. This table stores details about the articles, organized by categories, facilitating efficient retrieval and management of content.
-        \item \textbf{Read}: Capturing how users interact with articles over time, this table is pivotal for understanding user engagement and preferences, informing content strategy and system optimizations.
-        \item \textbf{Be-Read}: As an aggregate of the \textbf{Read} table, it reflects comprehensive readership metrics, including readership counts, agreements, and shares, indexed by article category. This data is vital for understanding content popularity and user interaction trends.
-        \item \textbf{Popular-Rank}: This table synthesizes interaction data to rank content according to various metrics, providing insights into what is trending or valuable to different user segments.
+        \item \textbf{User}: Capturing personal information about users, like their name, gender, email, phone, etc.
+        \item \textbf{Article}: Stores details about the articles, like their title and tags with links to images and videos.
+        \item \textbf{Read}: A relational table capturing article reads for every user including some meta information about how long the user took to read it and whether the user liked it.
+        \item \textbf{Be-Read}: As an aggregate of the \textbf{Read} table, it reflects comprehensive reader metrics, including read counts, agreements, and shares. This data is vital for understanding content popularity and user interaction trends.
+        \item \textbf{Popular-Rank}: Aggregating \textbf{Be-Read}, this table synthesizes interaction data to rank content according to various metrics, providing insights into what is trending each day, week or month.
     \end{itemize}
 
-    These components, while individually significant, collectively contribute to a robust and dynamic system capable of adapting to and evolving with the needs of its users. The system must not only store and manage this data efficiently but also derive actionable insights to continuously enhance user experience and system performance.
+    With the following entity relationship diagram~\ref{fig:reference-entity-relation-diagram}.
 
-    %TODO: Elaborate on the technical and practical challenges involved in managing and processing such a dataset.
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=5cm]{images/reference-entity-relation-diagram}
+        \caption{Reference Entity Relation Diagram}
+        \label{fig:reference-entity-relation-diagram}
+    \end{figure}
 
+    And each of the tables should be sharded by:
+
+    \begin{itemize}
+        \item \textbf{User}: Horizontally fragmented by region.
+        \item \textbf{Article}: Horizontally fragmented by region.
+        \item \textbf{Read}: Fragmented based on and with the same allocation schema as User table. Without replication.
+        \item \textbf{Be-Read}: Horizontally fragmented by category, with science articles being in both shards.
+        \item \textbf{Popular-Rank}: Fragmented based on granularity.
+    \end{itemize}
+
+    Considering the loose reference infrastructure architecture provided in figure~\ref{fig:reference-infrastructure-architecture}, we see that we need the following stack:
+
+    \begin{itemize}
+        \item Some distributed systems orchestration platform
+        \item Unstructured Data Management Layer
+        \item Structured Data Management Layer
+        \item Caching Layer
+        \item Application Layer
+    \end{itemize}
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=10cm]{images/reference-architecture}
+        \caption{Reference Infrastructure Architecture}
+        \label{fig:reference-infrastructure-architecture}
+    \end{figure}
+
+    For the functional requirements, we need to support bulk data loading, data insert/update/query, and monitoring of the servers and data.
+
+    Optional requirements include Hot/Cold Standby DBMSs for fault tolerance, upscaling/downscaling DBMSs, and cross DBMSs data migration.
 
     \section{Proposed Methodology}
-    To construct a system that meets our ambitious goals, we propose an integrated solution comprising several cutting-edge technologies, each selected for its proven efficacy and relevance to the project's objectives. We will first discuss the rationale behind our technology choices and then elaborate on how these technologies will be integrated to create our system.
-
+    To construct such system that meets these requirements, we propose an integrated solution comprising several cutting-edge technologies, each selected for its proven efficacy and relevance to the project's objectives. We will first discuss the rationale behind each technology choices and then elaborate on how these technologies will be integrated to create our system.
 
     \subsection{Technology Choices}
 
     \subsubsection{Containerization with Docker}
-    Docker's containerization technology is foundational to ensuring that our application is portable, consistent, and isolated from environmental inconsistencies across development and production platforms. This modularity is critical for testing, deployment, and scaling, allowing each component of the system to be developed, deployed, and scaled independently.
-
-    Docker utilizes Linux containers to package applications and their dependencies into isolated, executable components, reducing the overhead of creating and maintaining full virtual machines for running applications. It provides a toolkit for developers to build, deploy, and run containers using basic commands and automation, ensuring consistent environments across various stages of the development lifecycle.
-
-    The adaptability of Docker's containerization supports responsive deployment and scaling. Docker containers can be executed in diverse environments, from a developer's local laptop to various cloud providers, emphasizing the need for efficient deployment and management across different platforms.
-
-    Launched in 2013 as an open-source Docker Engine, Docker leveraged existing computing concepts around containers, particularly in the Linux world, using primitives known as cgroups and namespaces. This standardization has made the complex concepts of containerization more accessible and efficient for contemporary development needs.
+    Launched in 2013 as an open-source Docker Engine, Docker has become a go-to solution for portable applications. By leveraging existing computing concepts around containers, particularly in the Linux world, using primitives known as cgroups and namespaces, Docker reduces the overhead of creating and maintaining full virtual machines for running applications. This standardization of containerization has made the complex concepts of containerization more accessible and efficient for contemporary development needs. For instance, Docker's containerization technology is foundational to ensuring that our application is portable, consistent, and isolated from environmental inconsistencies across development and production platforms. This modularity is critical for testing, deployment, and allowing each component in a distributed system to be developed and deployed independently. In addition, the adaptability of the Docker Engine, supports responsive development and scaling, as Docker containers can be executed in diverse environments, from a developer's local laptop to various cloud providers. Finally, the modularity of Docker containers simplifies the process of scaling containers due to the ease and speed of creating new Docker containers.
 
     Docker's emergence has significantly accelerated the adoption of containerization technology. By abstracting complex containerization concepts into a user-friendly format, it has become an industry standard for containers, offering simple developer tools and a universal packaging approach. The widespread adoption of Docker underscores its importance as a tool for modern software development, testing, deployment, and scaling.
 
     \subsubsection{Orchestration with Kubernetes}
-    Kubernetes stands at the forefront of container orchestration technologies, automating various manual processes related to managing containers such as scheduling, launching, scaling, and healing. It is capable of handling multiple groups of containers across more than one cluster simultaneously, providing essential features like service discovery, load balancing, storage orchestration, and maintaining environmental consistency throughout different stages of development. Built on a set of loosely coupled, extensible building blocks (primitives) that rely on the Kubernetes API, Kubernetes introduces a robust, portable, and extensible open-source platform for managing containerized workloads and services, facilitating both declarative configuration and automation.
-
-    Also known as K8s, Kubernetes orchestrates the deployment, scaling, and management of containerized applications, grouping them into logical units for easy management and discovery. This system significantly enhances the orchestration of containerized applications across a cluster of nodes, which includes networking and storage infrastructure. One of its key features is resource scheduling, ensuring optimal distribution of Pods across all available nodes to maintain efficiency and balance.
-
-    Among its notable features is automatic bin packing, where Kubernetes intelligently positions containers based on required resources and other constraints, without compromising availability. This sophisticated resource management capability allows Kubernetes to automatically specify how each container in a pod consumes resources like CPU and RAM, further ensuring that applications run smoothly and efficiently.
+    Kubernetes stands at the forefront of container orchestration technologies, automating various manual processes related to managing containers such as scheduling, launching, scaling, and healing. It can be deployed on separate compute nodes, or simply taken as a service (e.g.\ Google Kubernetes Engine), providing a central API to manage Docker containers across all nodes. It is capable of handling multiple groups of containers across these nodes, providing essential features like networking, service discovery, load balancing, and storage orchestration. Every such feature is implemented as a primitive build block that rely on the Kubernetes API, where this API is commonly extended with custom so-called Kubernetes Operators that provide more control or features (e.g. Knative Serving and Eventing Framework).
 
     Kubernetes' extensive ecosystem and its ability to streamline deployment, scaling, and operations of application containers render it an indispensable tool for automating and managing the lifecycle of containerized applications, ensuring the system's reliability and scalability.
 
     \subsubsection{Package Management with Helm Charts}
-    Helm enhances Kubernetes's capabilities by facilitating the definition, installation, and upgrade of even the most complex Kubernetes applications. As an official Kubernetes deployment tool and part of the Cloud Native Computing Foundation, Helm simplifies the management of creation, packaging, configuration, and deployment of applications and services to Kubernetes clusters through Helm Charts. These charts are collections of Kubernetes YAML files designed to simplify the deployment process, making Helm an essential tool for modern application management in Kubernetes environments.
+    Helm enhances Kubernetes's capabilities by facilitating the definition, installation, and upgrade of even the most complex Kubernetes applications. Helm simplifies the management of creation, packaging, configuration, and deployment of applications and services to Kubernetes clusters through Helm Charts. These charts are collections of Kubernetes YAML files designed to simplify the deployment process. It also tracks the versioned history of each chart installation and change, enabling comprehensible commands to roll back to a previous version or upgrade to a newer one, thus maintaining consistency and reliability in deployments.
 
-    Helm Charts are created and maintained by a range of contributors including individual developers, organizations, cloud service providers, and technology vendors. Among these, Bitnami is a prominent contributor, offering a wide range of pre-packaged, production-ready Helm charts for various applications. These charts are known for their quality and reliability, ensuring that applications deployed using Bitnami’s charts meet high standards of security and performance.
+    Helm Charts are created and maintained by a range of contributors including individual developers, organizations, cloud service providers, and technology vendors. Among these, Bitnami is a prominent contributor, offering a wide range of pre-packaged, production-ready Helm charts for various applications. These charts are known for their quality and reliability, ensuring that applications deployed using Bitnami's charts meet high standards of security and performance.
 
-    As a package manager specifically for Kubernetes, Helm allows developers and operators to more easily package, configure, and deploy applications and services onto Kubernetes clusters. It addresses the need for managing the complexity and lifecycle of applications and their components, streamlining installation and updating processes, and maintaining a historical versioning of deployed applications.
-
-    Helm's ability to automate YAML manifests for Kubernetes objects and package information into charts makes it an invaluable tool for deploying to a Kubernetes cluster. It also tracks the versioned history of each chart installation and change, enabling comprehensible commands to roll back to a previous version or upgrade to a newer one, thus maintaining consistency and reliability in deployments.
-
-    Overall, Helm significantly contributes to the Kubernetes ecosystem by offering a streamlined, efficient method for package management, ultimately enhancing the scalability and management of containerized applications. Its wide adoption and support from various contributors, especially Bitnami, underline the collaborative and community-driven approach in managing and deploying applications in containerized environments.
+    Overall, Helm significantly contributes to the Kubernetes ecosystem by offering a streamlined, efficient method for package management, ultimately enhancing the management of containerized applications. Its wide adoption underline the collaborative and community-driven approach in managing and deploying applications in containerized environments.
 
     \subsubsection{Unstructured Data Management with MinIO}
-    MinIO offers an efficient and scalable solution for managing unstructured data with its high-performance, S3 compatible object storage system. It is Kubernetes-native, providing a consistent object storage interface across multiple cloud providers, on-premise, and at the edge. As the world's fastest object store, MinIO delivers exceptional performance with published GETs and PUTs results that exceed 325 GiB/sec and 165 GiB/sec on 32 nodes of NVMe drives and a 100Gbe network, offering a portable and high-performance storage system across all major Kubernetes platforms. It is widely trusted and utilized by multiple organizations for its performance and reliability.
+    MinIO offers an efficient and scalable solution for managing unstructured data with its high-performance, S3 compatible object storage system. It is Kubernetes-native, providing a consistent object storage interface across multiple cloud providers, on-premise, and at the edge. MinIO is recommended for complete S3 API functionality for object storage on Kubernetes. Its lightweight architecture allows it to run efficiently on low CPU and memory resources, enabling the hosting of a large number of tenants on shared hardware. This makes MinIO particularly effective in environments where resource efficiency and scalability are crucial. In addition, it provides full bucket or cluster replication, and has data fault-tolerance enabled by default using a bit-parity solution similar to RAID5/6. By supporting all core S3 features, it easy to integrate with existing S3 frameworks and easy to replace with any fully managed cloud provided object storage (considering its AGPL licence and relatively high commercial license cost).
 
-    MinIO is recommended for complete S3 API functionality for object storage on Kubernetes, providing a single global namespace and a consistent object storage interface across various environments. Its cloud-native and lightweight architecture allows it to run efficiently on low CPU and memory resources, enabling the hosting of a large number of tenants on shared hardware. This makes MinIO particularly effective in environments where resource efficiency and scalability are crucial.
-
-    MinIO's object storage solution supports all core S3 features and is built to deploy anywhere, from public or private clouds to bare metal infrastructure, orchestrated environments, and edge infrastructure. This versatility ensures that MinIO can cater to the varied and dynamic storage needs of modern applications and systems.
-
-    In summary, MinIO's high performance, robust fault tolerance mechanisms like erasure coding, and compatibility with a variety of cloud storage services make it a crucial component for managing unstructured data in containerized environments. Its integration with Kubernetes through the MinIO Operator enhances its capability to provide reliable and scalable object storage solutions, addressing the complex and varied data management needs of contemporary systems.
+    In summary, MinIO's high performance, robust fault tolerance mechanisms, and compatibility with a variety of cloud storage services make it a crucial component for managing unstructured data in containerized environments. Its integration with Kubernetes enhances its capability to provide reliable and scalable object storage solutions, addressing the complex and varied data management needs of contemporary systems.
 
     \subsubsection{Structured Data Handling with MongoDB}
-    MongoDB's flexible, document-oriented structure makes it particularly adept at managing structured data in our system. Its scalability, powerful indexing and querying capabilities, and support for complex aggregations and transactions ensure that our structured data is handled efficiently and effectively. Running MongoDB on Kubernetes requires careful consideration of storage options and proper configuration to optimize performance and reliability. The Bitnami Helm chart is a popular, well-documented option for deploying MongoDB, offering various configurations like standalone, replica set, or replica set with arbiter, simplifying the deployment and management of MongoDB within Kubernetes.
+    MongoDB's flexible, document-oriented structure makes it particularly adept at managing structured data in our system. It is a distributed database at its core level, which stores the data into JSON-like objects, meaning that it is also a NoSQL database. Its powerful indexing and querying capabilities, and support for complex aggregations and transactions ensure that our structured data is handled efficiently and effectively. The easy of sharding different tables across nodes makes it an easy choice for our requirements. The Bitnami Helm chart is a popular, well-documented option for deploying MongoDB, offering various configurations like standalone, replica set, or replica set with arbiters, simplifying the deployment and management of MongoDB within Kubernetes.
 
     \subsubsection{Caching with Redis}
-    Redis will serve as our primary caching solution in the Kubernetes environment, significantly enhancing the system's performance by reducing the load on databases and accelerating data retrieval. Redis's versatility in configurations and renowned performance makes it an ideal choice for caching needs. Its integration with Kubernetes ensures scalable and efficient management of cache instances, further optimizing the performance and responsiveness of applications.
+    Redis, an in-memory key-value data store provides a performant solution for short-lived data, such as message queues or caches. By using an in-memory database for the most frequently queried data, we can accelerate data retrieval and reduce load on the databases. Its integration with Kubernetes ensures scalable and efficient management of cache instances, further optimizing the performance and responsiveness of applications. This makes it an ideal choice for caching needs.
 
     \subsubsection{API Development with FastAPI}
-    FastAPI is an excellent choice for projects involving Kubernetes, Redis, MongoDB, and S3 due to its high performance, asynchronous support, and ease of use. As one of the fastest web frameworks for Python, it can efficiently handle high-load scenarios and large numbers of concurrent users, essential for systems utilizing databases like MongoDB and caching mechanisms like Redis. Its asynchronous handling is particularly beneficial for IO-bound tasks, common with interactions in MongoDB, Redis, and S3. FastAPI's automatic data validation ensures robust integration, while its compatibility with Kubernetes makes it ideal for scalable, containerized applications. The framework's straightforward design, complete with automatic API documentation, significantly eases the development and management of complex services. Thus, FastAPI stands out as a robust, efficient, and developer-friendly option for building APIs in demanding and dynamic environments.
+    FastAPI is an excellent choice for bootstrapping projects due to ease of use. Its asynchronous handling is particularly beneficial for IO-bound tasks, common with interactions in MongoDB, Redis, and S3. The framework's straightforward design, complete with automatic API documentation, significantly eases the development and management of complex services. Moreover, it provides documentation by integration of Swagger UI and ReDoc automatically generated based on the type hints and function signatures, making it easy to understand and test the API. Thus, FastAPI stands out as a robust, efficient, and developer-friendly option for building APIs in demanding and dynamic environments.
+
+    Note that FastAPI may not be a good choice for large scale enterprise applications, due to it being so simple. For large codebases, one may look at projects such as Django. Considering that the focus of this project should be on the database integration, we deemed the ease of development the most important factor in choosing an API framework.
 
     \subsubsection{Monitoring}
-    In a distributed system project, monitoring plays a crucial role in ensuring the performance and reliability of services. Monitoring is the real-time collection of metrics and logs from a system, providing insights into its health and performance. It is essential for maintaining system stability and efficiency, allowing operators to identify and resolve issues before they impact users. Centralized monitoring is particularly important in distributed systems, where the complexity of the system and the number of components make it difficult to identify and resolve issues without proper monitoring.
+    In a distributed system project, monitoring plays a crucial role in ensuring the performance and reliability of services. Monitoring is the real-time collection of metrics and logs from a system, providing insights into its health and performance. It allows operators to identify and resolve issues before they have large impact on users. Centralized monitoring is particularly important in distributed systems, where the complexity of the system and the number of components make it difficult to identify and resolve issues without proper monitoring.
 
     \textbf{Metrics}:
     Prometheus is a key tool in this domain, serving as an open-source monitoring and alerting toolkit with a powerful time-series database and query language. For this project, we decided to use Prometheus as a metrics scraping platform due to its popularity, ease of use, and compatibility with Kubernetes and many other open-source applications (many projects provide prometheus metrics endpoints).
@@ -170,121 +159,150 @@
     The facto choice for dashboard management in the Prometheus ecosystem is Grafana, an open-source visualization platform that allows users to create, explore, and share dashboards that visualize the metrics data collected by Prometheus. Grafana is highly customizable, with a wide range of plugins and community-built dashboards, making it an ideal choice for monitoring and visualization. It also integrates with AlertManager, allowing for the creation of dashboards that display alerts and their status.
 
     \textbf{Prometheus Operator}
-    These tools are deployed using the Prometheus Operator, a method that simplifies the deployment and management of Prometheus, Grafana, and Alertmanager in Kubernetes environments. The operator provides a cluster-wide framework for lifecycle management, including resource deployment and configuration, and offers a more automated and scalable approach to monitoring. Within this setup, the new K8s objects ServiceMonitors and PodMonitors are crucial. ServiceMonitors define how groups of services should be monitored by Prometheus, specifying the endpoints to scrape metrics from, along with the scraping interval and other parameters. They are particularly useful for monitoring services that dynamically scale within Kubernetes. On the other hand, PodMonitors offer a more granular approach by allowing Prometheus to scrape metrics from specific pods, giving insights into the performance of individual pods outside the service abstraction. Many Bitnami Helm charts provide ServiceMonitors and PodMonitors out of the box, making them an ideal choice for monitoring.
+    These tools are deployed using the Prometheus Operator, a method that simplifies the deployment and management of Prometheus, Grafana, and Alertmanager in Kubernetes environments. The operator provides a cluster-wide framework for lifecycle management, including resource deployment and configuration, and offers a more automated and scalable approach to monitoring. Among others, this setup introduces the crucial Kubernetes ServiceMonitors and PodMonitors. They define how groups of services pr pods should be monitored by Prometheus, specifying the endpoints to scrape metrics from, along with the scraping interval and other parameters. They are particularly useful for monitoring services that dynamically scale within Kubernetes. Many Bitnami Helm charts provide ServiceMonitors and PodMonitors out of the box, making them an ideal choice for monitoring.
 
     Together, Prometheus, Grafana, and AlertManager, when deployed via the Prometheus Operator and utilizing ServiceMonitors and PodMonitors, create a powerful, scalable monitoring solution that can adapt to the changing landscape of a distributed system, providing vital metrics and alerts to maintain system health and performance.
 
     \subsection{System Architecture}
     This section provides an overview of the deployment and interaction of various components within the system. Our architecture is designed for scalability, high availability, and robust monitoring, utilizing a combination of Kubernetes, databases, storage solutions, and a Python API.
 
-    \subsection{Deployment Overview}
+    \subsubsection{Deployment Overview}
 
-    \begin{itemize}
-        \item \textbf{Kubernetes on Minikube:} Minikube is used to deploy a Kubernetes cluster on a local machine. This will allow us to test and develop our system in a local environment before deploying it to a cloud provider.
-        \item \textbf{Monitoring Tools:} Prometheus operator with default Grafana and AlertManager.
-        \item \textbf{Minio S3 Storage:} Default MinIO provided chart configured with 4 nodes, each with 2 drives, and service-monitors for Prometheus.
-        \item \textbf{MongoDB:} Bitnami provided chart configured with a cluster of 3 config servers, 3 mongos routers, and 2 shards, each with 3 replicas. It includes prometheus pod monitors too.
-        \item \textbf{Redis:} Deployed with 1 master and 3 replicas without persistence and with service and pod monitors included.
-        \item \textbf{API:} Simple K8s service and deployment with 3 replicas.
-    \end{itemize}
+    \textbf{Kubernetes on Minikube:} Minikube is used to deploy a Kubernetes cluster on a local machine. This will allow us to test and develop our system in a local environment before deploying it to a cloud provider.
 
-    \subsection{Component Interaction}
+    \textbf{Monitoring Tools:} Prometheus operator with default Grafana and AlertManager.
 
-    Components in the system interact as follows:
+    \textbf{Minio S3 Storage:} Default MinIO provided chart configured with 4 nodes, each with 2 drives, and service-monitors for Prometheus.
 
-    \begin{itemize}
-        \item Kubernetes orchestrates all components, managing their lifecycle, scaling, and networking.
-        \item The Python API interacts with Minio for object storage, MongoDB for persistent data storage, and Redis for caching.
-        \item Monitoring tools are integrated throughout, with Prometheus gathering metrics, Grafana for visualization, and Alertmanager handling alerts.
-    \end{itemize}
-    \subsection{Architecture Diagram}
-    \begin{figure}[hpp]
+    \textbf{MongoDB:} The infrastructure for supporting sharding in MongoDB requires several components, namely Mongos (MongoDB Router), Config Servers, and Shards. The Config Server Mongo instances keep track of all the metadata related to the shard instances, which register themselves with the config server as soon as they are spawned. The MongoDB Router acts as a middleware between the client and the data, communicating to the config server to know in what shard the data is placed when requested. We use the Bitnami Helm chart to deploy 3 routers, 3 config servers, 2 shards, each with 3 replicas.
+
+    \textbf{Redis:} Deployed with 1 master and 3 replicas without persistence and with service and pod monitors included.
+
+    \textbf{API:} Simple K8s service and deployment with 3 replicas.
+
+    \subsubsection{Component Interaction}
+
+    Kubernetes orchestrates all components, managing their lifecycle, scaling, and networking. The Python API interacts with Minio for object storage, MongoDB for persistent data storage, and Redis for caching. Monitoring tools are integrated throughout, with Prometheus gathering metrics, Grafana for visualization, and Alertmanager handling alerts.
+
+    \begin{figure}[h]
         \centering
-        \includegraphics[width=16cm]{images/cluster.png}
+        \includegraphics[width=11cm]{images/architecture}
         \caption{Solution Infrastructure}
         \label{fig:cluster}
     \end{figure}
 
     \subsection{Application Configuration}
 
-    \subsubsection{MinIO}
-    In the MinIO helm chart values file, MinIO is initialized with a bucket called media, without any versioning, object-locking, or any manual replication settings.
-    A set of default credentials is used.
+    The entire source code has been attached to this report. The following sections describe implementation details for each of the requirements.
 
-    We've provided a script in s3-seed, in which all article text, videos, and images are bulk uploaded to the media bucket.
+    \subsubsection{Unstructured Data Management / MinIO}
+    All articles, videos, and texts should be stored in the unstructured data layer, for which we use MinIO. We deploy MinIO with the MinIO provided Helm Chart, for which our used Helm values can be found in the s3 folder. We initialize it with an empty bucket called media, without any versioning, object-locking, or any manual replication settings. A set of default credentials is used. For demonstrative purposes, we create several data nodes and attach multiple drives to each node.
 
-    \subsubsection{MongoDB}
-    In regards to the main database choice in our solution, Mongo DB seemed to provide all the necessary functionalities. It is a distributed database at its core level, which stores the data into JSON-like objects, meaning that it is also a NoSQL database. The data infrastructure for supporting sharding in Mongo DB requires several components, namely Mongos (Mongo DB Router), Config Servers, and Shards. The Config Server Mongo instances are responsible for keeping track of all the metadata related to the shard instances. Whenever a shard instance is spawned, it immediately registers itself into the config server. The Mongo DB Router acts as a middleware between the client and the data. It communicates to the config server to know in what shard the data is placed when requested. Each of the instances can be replicated, including the data that is stored on them. In our solution, each instance has 3 replicas. The data infrastructure is visible in the figure below.  
-    \begin{figure}[hpp]
-        \centering
-        \includegraphics[width=10cm]{images/mongo-cluster.png}
-        \caption{Mongo DB Data Infrastructure}
-        \label{fig:mongo}
-    \end{figure}
-    $\\$
-    MongoDB offers aggregation pipelines which are essentially a powerful feature that allows processing and transformation of data within the database. Aggregation pipelines provide a framework for performing complex data manipulations, aggregations, and transformations on documents in a MongoDB collection. An aggregation pipeline is a series of stages through which documents pass, with each stage performing a specific operation on the data. These stages are executed sequentially, and the result of each stage becomes the input for the next stage. The pipeline stages can include operations such as filtering, sorting, grouping, and applying various transformations. To fulfill the requirements of the project, several aggregation pipelines were utilized (\ref{subsec:appendix-aggregation}) . What is more, on-demand materialized views were utilized when the computation of new collections was needed. This type of view is a pre-computed aggregation pipeline result that is stored on and read from disk. The pipelines can be reused whenever the data has to be updated from the original table and this is essentially why it is an on-demand materialized view.  
+    %TODO: describe election in MinIO
+
+    For the bulk data loading of the generated text, image, and video data, we've provided a script in s3-seed to upload all to the created bucket.
+
+    \subsubsection{Structured Data Management / MongoDB}
+    \textbf{Aggregation pipelines}: essentially a powerful feature that allows processing and transformation of data within the database. Aggregation pipelines provide a framework for performing complex data manipulations, aggregations, and transformations on documents in a MongoDB collection. An aggregation pipeline is a series of stages through which documents pass, with each stage performing a specific operation on the data. These stages are executed sequentially, and the result of each stage becomes the input for the next stage. The pipeline stages can include operations such as filtering, sorting, grouping, and applying various transformations.
+
+    To fulfill the requirements of the project, several aggregation pipelines were utilized (\ref{subsec:appendix-aggregation}). These results can be viewed once as a view, but also stored on disk as another table (on-demand materialized views), again allowing them to be sharded across different nodes. Whenever the original table is updated, we can rerun the aggregation pipeline to update the views. We can also run aggregation pipelines in API queries to join several tables together.
+
+    All the different pipelines used are summarized below:
     \begin{enumerate}
-        \item Table Read Alternation: The requirement is to shard the table by region, however, the table doesn't include this property, hence, a lookup is performed in the User table then the region field is projected and merged into the Read table. Respectively, the same is done for the category field in the Article table.  
-        \item Table Be-Read Generation: The Be-Read table is generated by querying the Read table, grouping all items by article ID, and counting the total number of reads, shares, comments, and agreements. Finally, out put the result into the Be-Read table, including the category field as it is needed to shard the table. 
-        \item Table Popular-Rank Generation: The Popular Rank table is generated by the following aggregation pipeline, starting from the Be-Read table and doing it for each granularity:
+        \item \textbf{Table Read/Article Alternation}: The requirement is to shard the Read and Article table by region, however, these tables don't include this property. Hence, a lookup is performed in the User table then the region field is projected and merged into the tables.
+        \item \textbf{Table Be-Read Generation}: The Be-Read table is generated by querying the Read table, grouping all items by article ID, and counting the total number of reads, shares, comments, and agreements. Finally, the result is written into the Be-Read table, including the category field as it is needed to shard the table.
+        \item \textbf{Table Popular-Rank Generation}: The Popular Rank table is generated by the following aggregation pipeline, starting from the Be-Read table and doing it for each granularity:
          \begin{enumerate}
             \item Compute the unique period identified for specific granularity - day, week, month
             \item Group by period, compute the total interactions by summing together the total reads, comments, shares, and agreements, and push each related user who read the article into a list
             \item Sort the items by the number of total interactions with the most one starting from the beginning
             \item Project the fields and merge them into the new table Popular Rank
         \end{enumerate}
-        \item (Implementation Detail) Table Science Articles: One of the requirements is to allocate science articles into every shard in the cluster, however, Mongo DB doesn't support duplicated data as it is against the design principles behind the sharded cluster. Hence, a new on-demand materialized view is created by getting all the articles with the category science from the Article table and putting them into a new table Articles-Science. The same strategy is applied for the Be-Reads table as it has to be sharded in the same way as the Article table.
+        \item \textbf{Table Science Articles}: One of the requirements is to allocate science articles into every shard in the cluster, however, MongoDB doesn't support duplicated data as it is against the design principles behind the sharded cluster. Hence, a new on-demand materialized view is created by getting all the articles with the category science from the Article table and putting them into a new table Articles-Science. The same strategy is applied for the Be-Reads table as it has to be sharded in the same way as the Article table.
     \end{enumerate}
+
     An overview of the relevant data and finalized data is given below. 
-    \begin{figure}[hpp]
+    \begin{figure}[h]
         \centering
-        \includegraphics[width=15cm]{images/schema.png}
+        \includegraphics[width=\textwidth]{images/schema}
         \caption{MongoDB Data Overview}
         \label{fig:schema}
     \end{figure}
-    $\\$
-    The tables were shared in the following manner:
-    \begin{enumerate}
-        \item User: 
-        \begin{enumerate}
-            \item Shard1: Items with Region = "Beijing"
-            \item Shard2: Items with Region = "Hong Kong"
-        \end{enumerate}
-        \item Article: 
-        \begin{enumerate}
-            \item Shard1: Items with Category = "Science"
-            \item Shard2: Items with Category = "Science" and "Technology"
-        \end{enumerate}
-        \item Read: 
-        \begin{enumerate}
-            \item Shard1: Items with Region = "Beijing"
-            \item Shard2: Items with Region = "Hong Kong"
-        \end{enumerate}
-        \item Be-Read: 
-        \begin{enumerate}
-            \item Shard1: Items with Category = "Science"
-            \item Shard2: Items with Category = "Science" and "Technology"
-        \end{enumerate}
-        \item Popular-Rank: 
-        \begin{enumerate}
-            \item Shard1: Items with TemporalGranularity = "day"
-            \item Shard2: Items with TemporalGranularity = "week | month"
-        \end{enumerate}
-    \end{enumerate}
+
+    \begin{table}[h]
+        \centering
+        \begin{tabular}{|c|c|p{8cm}|}
+            \hline
+            \textbf{Table Name} & \textbf{Shard} & \textbf{Criteria} \\
+            \hline
+            \multirow{2}{*}{User} & Shard1 & Region = "Beijing" \\
+            \cline{2-3}
+            & Shard2 & Region = "Hong Kong" \\
+            \hline
+            \multirow{2}{*}{Article} & Shard1 & Category = "Science" \\
+            \cline{2-3}
+            & Shard2 & Category = "Science" and "Technology" \\
+            \hline
+            \multirow{2}{*}{Read} & Shard1 & Region = "Beijing" \\
+            \cline{2-3}
+            & Shard2 & Region = "Hong Kong" \\
+            \hline
+            \multirow{2}{*}{Be-Read} & Shard1 & Category = "Science" \\
+            \cline{2-3}
+            & Shard2 & Category = "Science" and "Technology" \\
+            \hline
+            \multirow{2}{*}{Popular-Rank} & Shard1 & Temporal Granularity = "day" \\
+            \cline{2-3}
+            & Shard2 & Temporal Granularity = "week | month" \\
+            \hline
+        \end{tabular}
+        \caption{Table Sharing Criteria}
+        \label{tab:table-sharing}
+    \end{table}
+
     The sharding configuration was implemented using the utility functions of Mongo shell. Scripts were created for consistent and automated deployment for both the aggregation pipelines and the sharding (\ref{subsec:appendix-sharding}).
-   
-    \subsubsection{Redis}
-    Redis does not require any configuration, we can use the deployment as is in our Python API. It is easily integrated into the Python API for querying. 
 
     \subsubsection{Python API}
-    Fast API was utilized for building a simple and quick API solution in Python. It is a modern, fast (high-performance), web framework for building APIs. Moreover, it provides documentation by integration of Swagger UI and ReDoc automatically generated based on the type hints and function signatures, making it easy to understand and test the API.
-    The following endpoints were created:
+    The following endpoints were created in the Python API:
     \begin{enumerate}
         \item Get Users: Querying User collection with or without filters
         \item Get Articles: Querying Article collection with or without filters, including getting text, images, and videos accordingly from the Minio S3 buckets
         \item Get Reads: Querying Read collection with or without filters, including joining of User and Article collection (including getting data from Minio S3 buckets)
         \item Get Be-Reads: Querying Be-Read collection with or without filters, including joining of Article table, including getting data from Minio S3 buckets
     \end{enumerate}
+
+    \subsubsection{Redis}
+    Redis does not require any configuration, we can use the deployment as is in our Python API. For each Python API endpoint, first we check if the requested data is already in the Redis cache and serve it if possible. If not, we query from MongoDB and save the result back to Redis for the next query. We always write to the Redis master and read from the Redis replicas.
+
+    \subsubsection{Monitoring}
+    For metric insights, there are many community-provided dashboards that work with our solution. In Grafana, it is easy to import these dashboards and visualize the metrics. Figure~\ref{fig:dashboard-minio} shows a MinIO dashboard, Figure~\ref{fig:dashboard-mongodb} shows a MongoDB dashboard, and Figure~\ref{fig:dashboard-redis} shows a Redis dashboard. Kubernetes dashboards are included by default.
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\textwidth]{images/dashboard-minio}
+        \caption{MinIO: \url{https://grafana.com/grafana/dashboards/13502/}}
+        \label{fig:dashboard-minio}
+    \end{figure}
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\textwidth]{images/dashboard-mongodb}
+        \caption{MongoDB: \url{https://grafana.com/grafana/dashboards/12079/} any "percona" dashboard works.}
+        \label{fig:dashboard-mongodb}
+    \end{figure}
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\textwidth]{images/dashboard-redis}
+        \caption{Redis: \url{https://grafana.com/grafana/dashboards/11835/}}
+        \label{fig:dashboard-redis}
+    \end{figure}
+
+    For AlertManager, Grafana does not allow direct imports of third-party rules, so we have to configure the rules manually. You may choose to create alert rules based on the team's preferences. Community-made rules can be found on \url{https://samber.github.io/awesome-prometheus-alerts/rules.html}. Figure~\ref{fig:alerting-create} shows an example of an alert rule.
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\textwidth]{images/alerting-create}
+        \caption{User Interface of creating a new alert rule in Grafana.}
+        \label{fig:alerting-create}
+    \end{figure}
 
     \section{Evaluation and Metrics}
     The evaluation of the proposed distributed database system was conducted through a rigorous assessment of various key performance metrics, ensuring the system's efficacy in handling the specified objectives. To gauge the efficiency of data storage and retrieval, metrics such as latency, throughput, and response time are scrutinized under varying loads and concurrent user scenarios. Latency measurements provide insights into the speed of data access, reflecting the system's responsiveness to user queries and interactions.
@@ -308,7 +326,7 @@
 
     \section{Appendix}
     \subsection{Sharding}\label{subsec:appendix-sharding}
-    \begin{lstlisting}[language=Python, caption=General sharding function]
+    \begin{lstlisting}[language=python, caption=General sharding function]
     const shardByKey = ({table, shardKey, shardValues}) => {
         sh.enableSharding(table);
     
@@ -324,7 +342,7 @@
     }
     \end{lstlisting}
     It can be noted that a function $changeLastLetter$ is used for the range of the shard. This is because MongoDB requires $min$ and $max$ range for each shard value, which is intuitive for numerical values, however, for string values the workaround is to change the last letter of the value to the next alphabetical letter.
-    \begin{lstlisting}[language=Python, caption=Sharding per region and category]
+    \begin{lstlisting}[language=python, caption=Sharding per region and category]
     const shardByRegion = (table, shardValues) => {
         shardByKey({
             table,
@@ -332,7 +350,7 @@
             shardValues,
         });
     };
-    
+
     const shardByCategory = (table, shardValues) => {
         shardByKey({
             table,
@@ -340,38 +358,37 @@
             shardValues,
         });
     };
-    
     \end{lstlisting}
-    \begin{lstlisting}[language=Python, caption=Sharding of each collection]
-   
+    \begin{lstlisting}[language=python, caption=Sharding of each collection]
+
     shardByRegion(USERS, [
         {tag: SHARD1TAG, value: "Beijing"},
         {tag: SHARD2TAG, value: "Hong Kong"},
     ]);
-    
+
     shardByRegion(READS, [
         {tag: SHARD1TAG, value: "Beijing"},
         {tag: SHARD2TAG, value: "Hong Kong"},
     ]);
-    
+
     shardByCategory(ARTICLES, [
         {tag: SHARD1TAG, value: "science"},
         {tag: SHARD2TAG, value: "technology"},
     ]);
-    
+
     shardByCategory(ARTICLES_SCIENCE, [
         {tag: SHARD1TAG, value: "science"},
     ]);
-    
+
     shardByCategory(BE_READS, [
         {tag: SHARD1TAG, value: "science"},
         {tag: SHARD2TAG, value: "technology"},
     ]);
-    
+
     shardByCategory(BE_READS_SCIENCE, [
         {tag: SHARD2TAG, value: "technology"},
-    ]); 
-    
+    ]);
+
     shardByKey({
         table: POPULAR_RANK,
         shardKey: "temporalGranularity",
@@ -384,15 +401,15 @@
     \end{lstlisting}
     \subsection{Aggregation Pipelines}\label{subsec:appendix-aggregation}
     Below is given the aggregation pipeline used to alternate the Read table and include region and category fields into it.
-    \begin{lstlisting}[language=Python, caption=Aggregation pipeline for alternating Read table]
-    
+    \begin{lstlisting}[language=python, caption=Aggregation pipeline for alternating Read table]
+
     const alternateReads = () => {
         db[USERS].createIndex({id: 1});
         db[USERS].createIndex({uid: 1});
         db[ARTICLES].createIndex({aid: 1});
         db[READS].createIndex({uid: 1});
         db[READS].createIndex({aid: 1});
-    
+
         db[READS].aggregate([
             {
                 $lookup: {
@@ -448,7 +465,7 @@
     
     \end{lstlisting}
      Below is given the aggregation pipeline used to generate the Be-Read table and from the Read table.
-    \begin{lstlisting}[language=Python, caption=Aggregation pipeline for generating Be-Read table]
+    \begin{lstlisting}[language=python, caption=Aggregation pipeline for generating Be-Read table]
     const computeBeReads = () => {
         db[READS].aggregate([
         {
@@ -516,7 +533,7 @@
     }
     \end{lstlisting}
     Below is given the aggregation pipeline used to generate the Popular-Rank table and from the Be-Read table.
-    \begin{lstlisting}[language=Python, caption=Aggregation pipeline for generating Popular-Rank table]
+    \begin{lstlisting}[language=python, caption=Aggregation pipeline for generating Popular-Rank table]
     const computePopularRank = () => {
         const granularity = ["day", "week", "month"];
         granularity.forEach(temporalGranularity => {

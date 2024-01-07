@@ -141,7 +141,7 @@ async def get_data_by_query(collection, skip, limit, background_tasks: Backgroun
     return await get_data(background_tasks=background_tasks, collection=collection, query=query, skip=skip, limit=limit)
 
 
-def join_collections(pipeline, from_collection, local_field, foreign_field, as_field, match_key, match_value):
+def join_collections(pipeline, from_collection, local_field, foreign_field, as_field):
     pipeline.append({
         "$lookup": {
             "from": from_collection,
@@ -306,7 +306,7 @@ async def get_read_by(background_tasks: BackgroundTasks,
 
     project_fields = {}
 
-    join_collections(pipeline, "users", "uid", "uid", "user", "id", user_id)
+    join_collections(pipeline, "users", "uid", "uid", "user")
     project_fields["user.id"] = 1
     project_fields["user.name"] = 1
     project_fields["user.gender"] = 1
@@ -318,9 +318,10 @@ async def get_read_by(background_tasks: BackgroundTasks,
     project_fields["user.preferTags"] = 1
     project_fields["user.obtainedCredits"] = 1
     pipeline.append({"$unwind": {"path": "$user"}})
-    pipeline.append({"$match": {"user.id": user_id}})
+    if user_id:
+        pipeline.append({"$match": {"user.id": user_id}})
 
-    join_collections(pipeline, "articles", "aid", "aid", "article", "", "")
+    join_collections(pipeline, "articles", "aid", "aid", "article")
     project_fields["article.id"] = 1
     project_fields["article.title"] = 1
     project_fields["article.category"] = 1

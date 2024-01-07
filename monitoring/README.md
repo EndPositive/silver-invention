@@ -9,6 +9,8 @@ kubectl wait \
 kubectl create -f kube-prometheus/manifests/
 ```
 
+note: podmonitors may be broken due to https://github.com/prometheus-operator/kube-prometheus/issues/2300
+
 # Access
 
 ```shell
