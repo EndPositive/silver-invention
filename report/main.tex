@@ -15,6 +15,33 @@
 \usepackage{multirow}
 \usepackage{tabularx}
 
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+
 \title{Distributed Databases Project}
 
 \author{
@@ -36,10 +63,11 @@
     \maketitle
 
     \begin{abstract}
-        % TODO: Compose a concise abstract summarizing the document's content.
+        This report presents a distributed database system adept at handling both structured and unstructured data with high efficiency. At its core, the system integrates advanced technologies such as Kubernetes, MinIO, MongoDB, Redis, and FastAPI. It is architected to achieve scalability, high availability, and incorporates robust monitoring strategies. The design leverages Kubernetes orchestration, diversified databases, storage solutions, and a Python-based API. This results in a system that is not only performant and reliable but also capable of handling extensive data volumes and high concurrency. The system excels in managing various data types, boosted by efficient caching mechanisms for real-time responsiveness. Further, the integration of monitoring tools offers instantaneous insights, facilitating swift identification and resolution of issues. Performance evaluations affirm the system's competency in meeting the needs for effective large-scale data storing and serving.
     \end{abstract}
 
     \tableofcontents
+    \pagebreak
 
     \section{Introduction and Motivation}
     The advent of distributed systems has revolutionized the way data is stored, accessed, and processed. As the digital universe expands exponentially, there is an incessant demand for systems that can handle vast and varied data types efficiently. This project seeks to address these needs by developing a distributed database system tailored to manage an extensive array of articles and user interactions. The envisioned system is not only required to handle high volumes of both structured and unstructured data but also ensure that data retrieval is both swift and reliable, accommodating a significant number of concurrent users. Furthermore, the system's architecture should be robust enough to maintain functionality even in the face of certain system failures, thereby ensuring a degree of fault tolerance crucial for maintaining service continuity.
@@ -168,6 +196,7 @@
     This section provides an overview of the deployment and interaction of various components within the system. Our architecture is designed for scalability, high availability, and robust monitoring, utilizing a combination of Kubernetes, databases, storage solutions, and a Python API.
 
     \subsubsection{Deployment Overview}
+    The following components are deployed in our system:
 
     \textbf{Kubernetes on Minikube:} Minikube is used to deploy a Kubernetes cluster on a local machine. This will allow us to test and develop our system in a local environment before deploying it to a cloud provider.
 
@@ -302,18 +331,18 @@
 
     \section{Implemented Advanced Features}\label{sec:advanced-requirements}
     This section describes the advanced features that we implemented in our solution.
-    \subsection{Hot/Cold Standby DBMSs}
+    \subsubsection{Hot/Cold Standby DBMSs}
     For MongoDB, we've implemented 2 shards with each 3 replicas. This ensures that the data is always available, even if one of the nodes fails.
 
     For Redis, we've implemented 1 master and 3 replicas, with the same effect as MongoDB.
 
     For S3, we've made use of MinIO erasure coding, ensuring data availability when one or more drives or nodes fail.
 
-    \subsection{Upscaling/Downscaling DBMSs}
+    \subsubsection{Upscaling/Downscaling DBMSs}
 
     Using Helm Charts, we can easily scale up and down the number of replicas for each component.
 
-    \subsection{Cross DBMSs Data Migration}
+    \subsubsection{Cross DBMSs Data Migration}
     For self-hosted Kubernetes solutions, data backup and migration can often be a maintainability nightmare. We would recommend taking a look at replacing the self-hosted layers to cloud managed services that provide data backups out of the box. For example, MongoDB Atlas can be used instead of the self-hosted MongoDB, which provides a fully managed MongoDB service with data backups and migration tools. Instead of MinIO, we can use AWS S3, which provides a fully managed S3 service with data backups and migration tools. For Redis, we can use AWS ElastiCache, which provides a fully managed Redis service.
 
     \section{Evaluation and Metrics}
@@ -332,273 +361,287 @@
     In summary, the evaluation process encompasses a meticulous examination of latency, throughput, scalability, reliability, data store performance, caching efficiency, API responsiveness, and the efficacy of monitoring tools. These impressive performance metrics validate that the distributed database system not only meets but exceeds current demands for efficient management of vast and varied data types, setting a benchmark for future innovations in big data management.
 
     \section{Conclusion}
-    %TODO: Summarize the project's objectives, methodologies, and anticipated contributions to the field of distributed databases. Reflect on the implications of the project for future research and applications.
-    
+    In conclusion, we have successfully implemented a distributed database system that meets the requirements of the project. We have also implemented several advanced features, including hot/cold standby DBMSs, upscaling/downscaling DBMSs, and cross DBMSs data migration. The system is highly performant, scalable, and reliable, with the ability to handle large volumes of data and concurrent users seamlessly. The system's efficacy in managing structured and unstructured data, and its robust caching mechanisms, ensure optimal performance and responsiveness. The integration of monitoring tools provides real-time insights into system components, enabling proactive issue identification and resolution. Overall, the system's performance tests validate its ability to meet current demands for efficient management of vast and varied data types.
+
     \section{Manual}
+    For the manual, please see the README.md file in the root of the project. It provides instructions to get started with the deployment of our cluster. The installation instructions of each of the components and how to access them are described in their respective folders.
+
+    Note that the manual is written for a Linux environment. For Windows, you may need to change some commands. In addition, although the manual should work out of the box, the distributed manner of the system may cause issues in some environments (e.g. different Minikube versions, VPN usage, etc.). We recommend to test the setup only if you have prior experience with Kubernetes and Docker.
+
+    You may request us a demo environment if you are unable to get the system running.
+
+    Versions used:
+    \begin{itemize}
+        \item Minikube: v1.32.0
+        \item Helm: v3.13.3
+        \item MongoDB: v7.0.5
+        \item MongoDB Helm Chart: v7.1.6
+        \item Redis: v7.2.3
+        \item Redis Helm Chart: v18.5.0
+        \item MinIO: v2023-09-30T07-02-29Z
+        \item MinIO Helm Chart: v5.0.14
+    \end{itemize}
 
     \section{Appendix}
     \subsection{Sharding}\label{subsec:appendix-sharding}
-    \begin{lstlisting}[language=python, caption=General sharding function]
-    const shardByKey = ({table, shardKey, shardValues}) => {
-        sh.enableSharding(table);
-    
-        db[table].createIndex({[shardKey]: 1});
-    
-        shardValues.forEach(({tag, value}) => {
-            sh.addTagRange(`${DB}.${table}`, {[shardKey]: value}, {[shardKey]: changeLastLetter(value)}, tag);
-        });
-    
-        sh.shardCollection(`${DB}.${table}`, {[shardKey]: 1});
-    
-        db[table].getShardDistribution(); // verify chunks distributed on shards
-    }
-    \end{lstlisting}
-    It can be noted that a function $changeLastLetter$ is used for the range of the shard. This is because MongoDB requires $min$ and $max$ range for each shard value, which is intuitive for numerical values, however, for string values the workaround is to change the last letter of the value to the next alphabetical letter.
-    \begin{lstlisting}[language=python, caption=Sharding per region and category]
-    const shardByRegion = (table, shardValues) => {
-        shardByKey({
-            table,
-            shardKey: "region",
-            shardValues,
-        });
-    };
+\begin{lstlisting}[language=python, caption=General sharding function]
+const shardByKey = ({table, shardKey, shardValues}) => {
+    sh.enableSharding(table);
 
-    const shardByCategory = (table, shardValues) => {
-        shardByKey({
-            table,
-            shardKey: "category",
-            shardValues,
-        });
-    };
-    \end{lstlisting}
-    \begin{lstlisting}[language=python, caption=Sharding of each collection]
+    db[table].createIndex({[shardKey]: 1});
 
-    shardByRegion(USERS, [
-        {tag: SHARD1TAG, value: "Beijing"},
-        {tag: SHARD2TAG, value: "Hong Kong"},
-    ]);
-
-    shardByRegion(READS, [
-        {tag: SHARD1TAG, value: "Beijing"},
-        {tag: SHARD2TAG, value: "Hong Kong"},
-    ]);
-
-    shardByCategory(ARTICLES, [
-        {tag: SHARD1TAG, value: "science"},
-        {tag: SHARD2TAG, value: "technology"},
-    ]);
-
-    shardByCategory(ARTICLES_SCIENCE, [
-        {tag: SHARD1TAG, value: "science"},
-    ]);
-
-    shardByCategory(BE_READS, [
-        {tag: SHARD1TAG, value: "science"},
-        {tag: SHARD2TAG, value: "technology"},
-    ]);
-
-    shardByCategory(BE_READS_SCIENCE, [
-        {tag: SHARD2TAG, value: "technology"},
-    ]);
-
-    shardByKey({
-        table: POPULAR_RANK,
-        shardKey: "temporalGranularity",
-        shardValues: [
-            {tag: SHARD1TAG, value: "daily"},
-            {tag: SHARD2TAG, value: "weekly"},
-            {tag: SHARD2TAG, value: "monthly"},
-        ],
+    shardValues.forEach(({tag, value}) => {
+        sh.addTagRange(`${DB}.${table}`, {[shardKey]: value}, {[shardKey]: changeLastLetter(value)}, tag);
     });
-    \end{lstlisting}
+
+    sh.shardCollection(`${DB}.${table}`, {[shardKey]: 1});
+
+    db[table].getShardDistribution(); // verify chunks distributed on shards
+}
+\end{lstlisting}
+    It can be noted that a function $changeLastLetter$ is used for the range of the shard. This is because MongoDB requires $min$ and $max$ range for each shard value, which is intuitive for numerical values, however, for string values the workaround is to change the last letter of the value to the next alphabetical letter.
+\begin{lstlisting}[language=python, caption=Sharding per region and category]
+const shardByRegion = (table, shardValues) => {
+    shardByKey({
+        table,
+        shardKey: "region",
+        shardValues,
+    });
+};
+
+const shardByCategory = (table, shardValues) => {
+    shardByKey({
+        table,
+        shardKey: "category",
+        shardValues,
+    });
+};
+\end{lstlisting}
+\begin{lstlisting}[language=python, caption=Sharding of each collection]
+shardByRegion(USERS, [
+    {tag: SHARD1TAG, value: "Beijing"},
+    {tag: SHARD2TAG, value: "Hong Kong"},
+]);
+
+shardByRegion(READS, [
+    {tag: SHARD1TAG, value: "Beijing"},
+    {tag: SHARD2TAG, value: "Hong Kong"},
+]);
+
+shardByCategory(ARTICLES, [
+    {tag: SHARD1TAG, value: "science"},
+    {tag: SHARD2TAG, value: "technology"},
+]);
+
+shardByCategory(ARTICLES_SCIENCE, [
+    {tag: SHARD1TAG, value: "science"},
+]);
+
+shardByCategory(BE_READS, [
+    {tag: SHARD1TAG, value: "science"},
+    {tag: SHARD2TAG, value: "technology"},
+]);
+
+shardByCategory(BE_READS_SCIENCE, [
+    {tag: SHARD2TAG, value: "technology"},
+]);
+
+shardByKey({
+    table: POPULAR_RANK,
+    shardKey: "temporalGranularity",
+    shardValues: [
+        {tag: SHARD1TAG, value: "daily"},
+        {tag: SHARD2TAG, value: "weekly"},
+        {tag: SHARD2TAG, value: "monthly"},
+    ],
+});
+\end{lstlisting}
     \subsection{Aggregation Pipelines}\label{subsec:appendix-aggregation}
     Below is given the aggregation pipeline used to alternate the Read table and include region and category fields into it.
-    \begin{lstlisting}[language=python, caption=Aggregation pipeline for alternating Read table]
+\begin{lstlisting}[language=python, caption=Aggregation pipeline for alternating Read table]
+const alternateReads = () => {
+    db[USERS].createIndex({id: 1});
+    db[USERS].createIndex({uid: 1});
+    db[ARTICLES].createIndex({aid: 1});
+    db[READS].createIndex({uid: 1});
+    db[READS].createIndex({aid: 1});
 
-    const alternateReads = () => {
-        db[USERS].createIndex({id: 1});
-        db[USERS].createIndex({uid: 1});
-        db[ARTICLES].createIndex({aid: 1});
-        db[READS].createIndex({uid: 1});
-        db[READS].createIndex({aid: 1});
-
-        db[READS].aggregate([
-            {
-                $lookup: {
-                    from: USERS,
-                    localField: "uid",
-                    foreignField: "uid",
-                    as: "user",
+    db[READS].aggregate([
+        {
+            $lookup: {
+                from: USERS,
+                localField: "uid",
+                foreignField: "uid",
+                as: "user",
+            },
+        },
+        {
+            $lookup: {
+                from: ARTICLES,
+                localField: "aid",
+                foreignField: "aid",
+                as: "article",
+            },
+        },
+        {
+            $project: {
+                _id: 1,
+                timestamp: 1,
+                id: 1,
+                uid: 1,
+                aid: 1,
+                readTimeLength: 1,
+                agreeOrNot: 1,
+                commentOrNot: 1,
+                shareOrNot: 1,
+                commentDetail: 1,
+                region: {
+                    $getField: {
+                        field: "region",
+                        input: {
+                            $arrayElemAt: ["$user", 0],
+                        },
+                    },
+                },
+                category: {
+                    $getField: {
+                        field: "category",
+                        input: {
+                            $arrayElemAt: ["$article", 0],
+                        },
+                    },
                 },
             },
+        },
+        {
+            $merge: READS,
+        },
+    ])
+}
+\end{lstlisting}
+     Below is given the aggregation pipeline used to generate the Be-Read table and from the Read table.
+\begin{lstlisting}[language=python, caption=Aggregation pipeline for generating Be-Read table]
+const computeBeReads = () => {
+    db[READS].aggregate([
+    {
+        $group:
             {
-                $lookup: {
-                    from: ARTICLES,
-                    localField: "aid",
-                    foreignField: "aid",
-                    as: "article",
+                _id: "$aid",
+                timestamp: {$first: "$timestamp"},
+                aid: {$first: "$aid"},
+                category: {$first: "$category"},
+                readNum: {$sum: {$toInt: "$readTimeLength"}},
+                readUidList: {
+                    $addToSet: {
+                        $cond: {
+                            if: {
+                                $eq: ["$readOrNot", "1"],
+                            },
+                            then: "$uid",
+                            else: "$REMOVE",
+                        },
+                    },
                 },
+                commentNum: {$sum: {$toInt: "$commentOrNot"}},
+                commentUidList: {
+                    $addToSet: {
+                        $cond: {
+                            if: {
+                                $eq: ["$commentOrNot", "1"],
+                            },
+                            then: "$uid",
+                            else: "$REMOVE",
+                        },
+                    },
+                },
+                agreeNum: {$sum: {$toInt: "$agreeOrNot"}},
+                agreeUidList: {
+                    $addToSet: {
+                        $cond: {
+                            if: {
+                                $eq: ["$agreeOrNot", "1"],
+                            },
+                            then: "$uid",
+                            else: "$REMOVE",
+                        },
+                    },
+                },
+                shareNum: {$sum: {$toInt: "$shareOrNot"}},
+                shareUidList: {
+                    $addToSet: {
+                        $cond: {
+                            if: {
+                                $eq: ["$shareOrNot", "1"],
+                            },
+                            then: "$uid",
+                            else: "$REMOVE",
+                        },
+                    },
+                },
+            }
+    },
+    {
+        $out: BE_READS,
+    },
+],
+{allowDiskUse: true})
+}
+\end{lstlisting}
+    Below is given the aggregation pipeline used to generate the Popular-Rank table and from the Be-Read table.
+\begin{lstlisting}[language=python, caption=Aggregation pipeline for generating Popular-Rank table]
+const computePopularRank = () => {
+    const granularity = ["day", "week", "month"];
+    granularity.forEach(temporalGranularity => {
+        db[BE_READS].aggregate([
+            {
+            $set: {
+                period: {
+                    $dateTrunc: {
+                        date: {$toDate: {$toLong: "$timestamp"}},
+                        unit: temporalGranularity
+                    }
+                }
+            }
+            },
+            {
+                $group: {
+                    _id: "$period",
+                    totalInteractions: {
+                        $sum: {
+                            $add: [
+                                "$readNum",
+                                "$commentNum",
+                                "$agreeNum",
+                                "$shareNum",
+                            ]
+                        }
+                    },
+                    articleAidList: {$push: "$aid"}
+                }
+            },
+            {
+                $sort: {
+                    "_id": 1,
+                    "totalInteractions": -1
+                }
             },
             {
                 $project: {
-                    _id: 1,
-                    timestamp: 1,
-                    id: 1,
-                    uid: 1,
-                    aid: 1,
-                    readTimeLength: 1,
-                    agreeOrNot: 1,
-                    commentOrNot: 1,
-                    shareOrNot: 1,
-                    commentDetail: 1,
-                    region: {
-                        $getField: {
-                            field: "region",
-                            input: {
-                                $arrayElemAt: ["$user", 0],
-                            },
-                        },
-                    },
-                    category: {
-                        $getField: {
-                            field: "category",
-                            input: {
-                                $arrayElemAt: ["$article", 0],
-                            },
-                        },
-                    },
-                },
+                    _id: {$toLong: "$_id"},
+                    timestamp: {$toLong: "$_id"},
+                    period: "$_id",
+                    temporalGranularity: temporalGranularity,
+                    articleAidList: 1
+                }
             },
             {
-                $merge: READS,
-            },
+                $merge: {
+                    into: "popular_rank",
+                }
+            }
         ])
-    }
-    
-    \end{lstlisting}
-     Below is given the aggregation pipeline used to generate the Be-Read table and from the Read table.
-    \begin{lstlisting}[language=python, caption=Aggregation pipeline for generating Be-Read table]
-    const computeBeReads = () => {
-        db[READS].aggregate([
-        {
-            $group:
-                {
-                    _id: "$aid",
-                    timestamp: {$first: "$timestamp"},
-                    aid: {$first: "$aid"},
-                    category: {$first: "$category"},
-                    readNum: {$sum: {$toInt: "$readTimeLength"}},
-                    readUidList: {
-                        $addToSet: {
-                            $cond: {
-                                if: {
-                                    $eq: ["$readOrNot", "1"],
-                                },
-                                then: "$uid",
-                                else: "$REMOVE",
-                            },
-                        },
-                    },
-                    commentNum: {$sum: {$toInt: "$commentOrNot"}},
-                    commentUidList: {
-                        $addToSet: {
-                            $cond: {
-                                if: {
-                                    $eq: ["$commentOrNot", "1"],
-                                },
-                                then: "$uid",
-                                else: "$REMOVE",
-                            },
-                        },
-                    },
-                    agreeNum: {$sum: {$toInt: "$agreeOrNot"}},
-                    agreeUidList: {
-                        $addToSet: {
-                            $cond: {
-                                if: {
-                                    $eq: ["$agreeOrNot", "1"],
-                                },
-                                then: "$uid",
-                                else: "$REMOVE",
-                            },
-                        },
-                    },
-                    shareNum: {$sum: {$toInt: "$shareOrNot"}},
-                    shareUidList: {
-                        $addToSet: {
-                            $cond: {
-                                if: {
-                                    $eq: ["$shareOrNot", "1"],
-                                },
-                                then: "$uid",
-                                else: "$REMOVE",
-                            },
-                        },
-                    },
-                }
-        },
-        {
-            $out: BE_READS,
-        },
-    ],
-    {allowDiskUse: true})
-    }
-    \end{lstlisting}
-    Below is given the aggregation pipeline used to generate the Popular-Rank table and from the Be-Read table.
-    \begin{lstlisting}[language=python, caption=Aggregation pipeline for generating Popular-Rank table]
-    const computePopularRank = () => {
-        const granularity = ["day", "week", "month"];
-        granularity.forEach(temporalGranularity => {
-            db[BE_READS].aggregate([
-                {
-                $set: {
-                    period: {
-                        $dateTrunc: {
-                            date: {$toDate: {$toLong: "$timestamp"}},
-                            unit: temporalGranularity
-                        }
-                    }
-                }
-                },
-                {
-                    $group: {
-                        _id: "$period",
-                        totalInteractions: {
-                            $sum: {
-                                $add: [
-                                    "$readNum",
-                                    "$commentNum",
-                                    "$agreeNum",
-                                    "$shareNum",
-                                ]
-                            }
-                        },
-                        articleAidList: {$push: "$aid"} 
-                    }
-                },
-                {
-                    $sort: {
-                        "_id": 1,
-                        "totalInteractions": -1
-                    }
-                },
-                {
-                    $project: {
-                        _id: {$toLong: "$_id"},
-                        timestamp: {$toLong: "$_id"},
-                        period: "$_id",
-                        temporalGranularity: temporalGranularity,
-                        articleAidList: 1 
-                    }
-                },
-                {
-                    $merge: {
-                        into: "popular_rank",
-                    }
-                }
-            ])
-        })
-    }
-    \end{lstlisting}
+    })
+}
+\end{lstlisting}
 \end{document}
 
