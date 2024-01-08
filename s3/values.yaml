@@ -11,6 +11,9 @@ replicas: 8
 # Number of expanded MinIO clusters
 pools: 1
 
+service:
+  type: LoadBalancer
+
 ## Enable persistence using Persistent Volume Claims
 persistence:
   enabled: true

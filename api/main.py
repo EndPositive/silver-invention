@@ -9,8 +9,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
 from redis import asyncio as aioredis
+from starlette.responses import Response
 
-from api.redis_replica_backend import RedisReplicaBackend
+from redis_replica_backend import RedisReplicaBackend
 
 UVICORN_HOST = os.environ.get("UVICORN_HOST", "127.0.0.1")
 UVICORN_PORT = os.environ.get("UVICORN_PORT", 8000)
@@ -20,7 +21,8 @@ MONGODB_URL = os.environ.get("MONGODB_URL", "mongodb://root:root@localhost:27017
 REDIS_MASTER_URL = os.environ.get("REDIS_MASTER_URL", "redis://@localhost:6379/0")
 REDIS_REPLICA_URL = os.environ.get("REDIS_REPLICA_URL", "redis://@localhost:6379/0")
 
-S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", "http://localhost:9000")
+S3_INTERNAL_ENDPOINT_URL = os.environ.get("S3_INTERNAL_ENDPOINT_URL", "http://localhost:9000")
+S3_EXTERNAL_ENDPOINT_URL = os.environ.get("S3_EXTERNAL_ENDPOINT_URL", "http://localhost:9000")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "media")
 S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", "PASSWORD")
 S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", "USERNAME")
@@ -32,12 +34,13 @@ MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "database")
 async def lifespan(app: FastAPI):
     # Initialize MongoDB client
     global mongo_db
+    print("waiting for mongodb connection...")
     mongo_client = AsyncIOMotorClient(MONGODB_URL)
     mongo_db = mongo_client[MONGODB_DB_NAME]
-    print("waiting for mongodb connection...")
     print(await mongo_client.server_info())
 
     # Initialize Redis client with a master and replica
+    print("waiting for redis connection...")
     redis_master = aioredis.from_url(REDIS_MASTER_URL)
     redis_replica = aioredis.from_url(REDIS_REPLICA_URL)
     FastAPICache.init(RedisReplicaBackend(redis_master, redis_replica))
@@ -48,16 +51,15 @@ async def lifespan(app: FastAPI):
 
     # Initialize S3 client from S3 bucket name and URL
     global s3
+    print("waiting for s3 connection...")
     s3 = boto3.client(
         's3',
-        endpoint_url=S3_ENDPOINT_URL,
+        endpoint_url=S3_INTERNAL_ENDPOINT_URL,
         aws_access_key_id=S3_ACCESS_KEY_ID,
         aws_secret_access_key=S3_SECRET_ACCESS_KEY,
         config=boto3.session.Config(signature_version='s3v4', region_name='us-east-1')
     )
-
     # test if s3 is connected
-    print("waiting for s3 connection...")
     print(s3.list_buckets())
     yield
     await redis_master.close()
@@ -66,6 +68,14 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI app
 app = FastAPI(lifespan=lifespan)
+
+
+# probes
+@app.get("/readiness", include_in_schema=False)
+@app.get("/liveness", include_in_schema=False)
+async def readiness_probe():
+    # return empty HTTP response with 200
+    return Response()
 
 
 def parse_output(output):
@@ -141,7 +151,7 @@ def process_articles_response(rows):
                     "Bucket": S3_BUCKET_NAME,
                     "Key": image_file_name
                 }
-            )
+            ).replace(S3_INTERNAL_ENDPOINT_URL, S3_EXTERNAL_ENDPOINT_URL)
             for image_file_name in row["image"].split(",") if image_file_name
         ]
 
@@ -152,7 +162,7 @@ def process_articles_response(rows):
                     "Bucket": S3_BUCKET_NAME,
                     "Key": row["video"]
                 }
-            )
+            ).replace(S3_INTERNAL_ENDPOINT_URL, S3_EXTERNAL_ENDPOINT_URL)
 
     return rows
 
@@ -289,4 +299,4 @@ async def get_read_by(user_id: str = None, skip: int = 0, limit: int = 10):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host=UVICORN_HOST, port=UVICORN_PORT)
+    uvicorn.run(app, host=UVICORN_HOST, port=int(UVICORN_PORT))

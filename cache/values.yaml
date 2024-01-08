@@ -9,7 +9,7 @@ master:
   ## ref: https://redis.io/topics/config
   ##
   configuration: ""
-
+  
   persistence:
     enabled: false
 
@@ -19,7 +19,7 @@ replica:
   ## ref: https://redis.io/topics/config
   ##
   configuration: ""
-
+  
   persistence:
     enabled: false
 

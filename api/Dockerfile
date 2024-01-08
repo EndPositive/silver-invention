@@ -7,4 +7,6 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && 
 
 COPY . .
 
+ENV PYTHONPATH "${PYTHONPATH}:/usr/src/app"
+
 CMD ["python", "main.py"]

@@ -4,3 +4,4 @@
 # But not these files
 !main.py
 !requirements.txt
+!redis_replica_backend.py
