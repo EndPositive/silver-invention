@@ -1,14 +1,16 @@
-import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 import boto3
-import redis
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import FastAPI
 from fastapi.responses import RedirectResponse, JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
-from redis import Redis
+from fastapi_cache import FastAPICache
+from fastapi_cache.decorator import cache
+from redis import asyncio as aioredis
+
+from api.redis_replica_backend import RedisReplicaBackend
 
 UVICORN_HOST = os.environ.get("UVICORN_HOST", "127.0.0.1")
 UVICORN_PORT = os.environ.get("UVICORN_PORT", 8000)
@@ -25,60 +27,45 @@ S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", "USERNAME")
 
 MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "database")
 
-# Initialize MongoDB client
-mongo_client = AsyncIOMotorClient(MONGODB_URL)
-mongo_db = mongo_client[MONGODB_DB_NAME]
-
-# Initialize Redis client with a master and replica
-redis_master: Redis = redis.Redis.from_url(REDIS_MASTER_URL, db=0)
-redis_replica: Redis = redis.Redis.from_url(REDIS_REPLICA_URL, db=0)
-
-# Initialize S3 client from S3 bucket name and URL
-s3 = boto3.client(
-    's3',
-    endpoint_url=S3_ENDPOINT_URL,
-    aws_access_key_id=S3_ACCESS_KEY_ID,
-    aws_secret_access_key=S3_SECRET_ACCESS_KEY,
-    config=boto3.session.Config(signature_version='s3v4', region_name='us-east-1')
-)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # test if mongo client is connected
+    # Initialize MongoDB client
+    global mongo_db
+    mongo_client = AsyncIOMotorClient(MONGODB_URL)
+    mongo_db = mongo_client[MONGODB_DB_NAME]
     print("waiting for mongodb connection...")
     print(await mongo_client.server_info())
-    # test if redis master and replica are connected
+
+    # Initialize Redis client with a master and replica
+    redis_master = aioredis.from_url(REDIS_MASTER_URL)
+    redis_replica = aioredis.from_url(REDIS_REPLICA_URL)
+    FastAPICache.init(RedisReplicaBackend(redis_master, redis_replica))
     print("waiting for redis master connection...")
-    print(redis_master.ping())
+    print(await redis_master.ping())
     print("waiting for redis replica connection...")
-    print(redis_replica.ping())
+    print(await redis_replica.ping())
+
+    # Initialize S3 client from S3 bucket name and URL
+    global s3
+    s3 = boto3.client(
+        's3',
+        endpoint_url=S3_ENDPOINT_URL,
+        aws_access_key_id=S3_ACCESS_KEY_ID,
+        aws_secret_access_key=S3_SECRET_ACCESS_KEY,
+        config=boto3.session.Config(signature_version='s3v4', region_name='us-east-1')
+    )
+
     # test if s3 is connected
     print("waiting for s3 connection...")
     print(s3.list_buckets())
     yield
-    redis_master.close()
-    redis_replica.close()
+    await redis_master.close()
+    await redis_replica.close()
 
 
 # Initialize FastAPI app
 app = FastAPI(lifespan=lifespan)
-
-
-async def set_cache(data, key: str):
-    return redis_master.set(
-        key,
-        json.dumps(data),
-        ex=120,
-    )
-
-
-async def get_cache(key: str):
-    result = redis_replica.get(key)
-    if not result:
-        return None
-
-    return json.loads(result)
 
 
 def parse_output(output):
@@ -88,57 +75,23 @@ def parse_output(output):
     return output
 
 
-def build_cache_key(collection, skip, limit, query):
-    cache_components = {
-        'collection': collection.name,  # assuming collection has a 'name' attribute
-        'skip': skip,
-        'limit': limit,
-        'query': query,
-    }
-
-    cache_key = json.dumps(cache_components, sort_keys=True)
-    return cache_key
-
-
-async def get_cached_data(collection, skip, limit, query) -> (dict, bool):
-    cache_key = build_cache_key(collection, skip, limit, query)
-
-    cached = await get_cache(cache_key)
-    if cached:
-        return cached, True
-
-    return {}, False
-
-
-def set_cached_data(background_tasks: BackgroundTasks, collection, skip, limit, query, result):
-    cache_key = build_cache_key(collection, skip, limit, query)
-
-    background_tasks.add_task(set_cache, result, cache_key)
-
-
-async def get_data(background_tasks: BackgroundTasks, collection, skip: int = 0, limit: int = 10, query: dict = {}) -> (
+async def get_data(collection, skip: int = 0, limit: int = 10, query: dict = {}) -> (
         dict, bool):
-    result, cached = await get_cached_data(collection, skip, limit, query)
-    if cached:
-        return result, cached
-
     result = await collection.find(query).skip(skip).limit(limit).to_list(limit)
 
     for row in result:
         if "period" in row:
             del row["period"]
 
-    set_cached_data(background_tasks, collection, skip, limit, query, result)
-
-    return result, False
+    return result
 
 
-async def get_data_by_query(collection, skip, limit, background_tasks: BackgroundTasks, **kwargs) -> (dict, bool):
+async def get_data_by_query(collection, skip, limit, **kwargs) -> (dict, bool):
     # Exclude specific variables from the query parameters
     query = {k: v for k, v in sorted(kwargs.items()) if v is not None}
 
     # Fetch data using the common get_data function
-    return await get_data(background_tasks=background_tasks, collection=collection, query=query, skip=skip, limit=limit)
+    return await get_data(collection=collection, query=query, skip=skip, limit=limit)
 
 
 def join_collections(pipeline, from_collection, local_field, foreign_field, as_field):
@@ -210,25 +163,24 @@ async def docs_redirect():
 
 
 @app.get("/users")
-async def get_user_by(background_tasks: BackgroundTasks, id: int = None, uid: int = None,
+@cache(expire=60)
+async def get_user_by(id: int = None, uid: int = None,
                       name: str = None, gender: str = None, email: str = None,
                       phone: str = None, dept: str = None, grade: str = None,
                       language: str = None, region: str = None, role: str = None,
                       preferTags: str = None, obtainedCredits: int = None, skip: int = 0, limit: int = 10):
-    result, cached = await get_data_by_query(mongo_db["users"], **locals())
-    return JSONResponse(content=parse_output(result), headers={"X-Cache": "Hit" if cached else "Miss"})
+    rows = await get_data_by_query(mongo_db["users"], **locals())
+    return JSONResponse(content=parse_output(rows))
 
 
 @app.get("/articles")
-async def get_article_by(background_tasks: BackgroundTasks, id: int = None, aid: int = None,
+@cache(expire=60)
+async def get_article_by(id: int = None, aid: int = None,
                          timestamp: str = None, title: str = None, category: str = None,
                          language: str = None, skip: int = 0, limit: int = 10):
-    rows, cached = await get_data_by_query(mongo_db["articles"], **locals())
-    if not cached:
-        rows = process_articles_response(parse_output(rows))
+    rows = await get_data_by_query(mongo_db["articles"], **locals())
 
-    return JSONResponse(content=rows,
-                        headers={"X-Cache": "Hit" if cached else "Miss"})
+    return JSONResponse(content=process_articles_response(parse_output(rows)))
 
 
 async def get_reads_collection(collection, params):
@@ -245,13 +197,9 @@ async def get_reads_collection(collection, params):
 
 
 @app.get("/be-read")
-async def get_be_read_by(background_tasks: BackgroundTasks,
-                         aid: int = None, category: str = None,
+@cache(expire=60)
+async def get_be_read_by(aid: int = None, category: str = None,
                          skip: int = 0, limit: int = 10):
-    rows, cached = await get_cached_data(mongo_db["beReads"], skip, limit, "aggregation")
-    if cached:
-        return JSONResponse(content=rows, headers={"X-Cache": "Hit"})
-
     bereads_collection, pipeline = await get_reads_collection(mongo_db["beReads"], locals())
 
     project_fields = {
@@ -279,29 +227,22 @@ async def get_be_read_by(background_tasks: BackgroundTasks,
     for row in rows:
         row["article"] = process_articles_response(parse_output([row["article"]]))[0]
 
-    set_cached_data(background_tasks, mongo_db["beReads"], skip, limit, "aggregation", rows)
+    return JSONResponse(content=rows)
 
-    return JSONResponse(content=rows, headers={"X-Cache": "Miss"})
 
 @app.get("/popular")
-async def get_popular(background_tasks: BackgroundTasks,
-                         temporalGranularity: str = None, timestamp: int = 1506988800000):
+@cache(expire=60)
+async def get_popular(temporalGranularity: str = None, timestamp: int = 1506988800000):
     popular = await get_data_by_query(mongo_db["popular_rank"], skip=0, limit=5, **locals())
-    articleIds = popular[0][0]['articleAidList'][:5]
+    articleIds = popular[0]['articleAidList'][:5]
     query = {"aid": {"$in": articleIds}}
-    rows, cached = await get_data(background_tasks, mongo_db["articles"], query=query)
-    if cached:
-        return JSONResponse(content=rows, headers={"X-Cache": "Hit"})
+    rows = await get_data(mongo_db["articles"], query=query)
+    return JSONResponse(content=process_articles_response(parse_output(rows)))
 
-    return JSONResponse(content=process_articles_response(parse_output(rows)), headers={"X-Cache": "Miss"})
 
 @app.get("/reads")
-async def get_read_by(background_tasks: BackgroundTasks,
-                      user_id: str = None, skip: int = 0, limit: int = 10):
-    rows, cached = await get_cached_data(mongo_db["reads"], skip, limit, [user_id])
-    if cached:
-        return JSONResponse(content=rows, headers={"X-Cache": "Hit"})
-
+@cache(expire=60)
+async def get_read_by(user_id: str = None, skip: int = 0, limit: int = 10):
     reads_collection, pipeline = await get_reads_collection(mongo_db["reads"], locals())
 
     project_fields = {}
@@ -342,12 +283,10 @@ async def get_read_by(background_tasks: BackgroundTasks,
     for row in rows:
         row["article"] = process_articles_response(parse_output([row["article"]]))[0]
 
-    set_cached_data(background_tasks, mongo_db["reads"], skip, limit, "aggregation", rows)
-
-    return JSONResponse(content=rows, headers={"X-Cache": "Miss"})
+    return JSONResponse(content=rows)
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="localhost", port=8088)
+    uvicorn.run(app, host=UVICORN_HOST, port=UVICORN_PORT)
