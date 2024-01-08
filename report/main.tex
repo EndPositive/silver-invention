@@ -14,6 +14,7 @@
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{tabularx}
+\usepackage{cleveref}
 
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -82,9 +83,7 @@
 
 
     \section{Problem Statement}
-    Central in our investigation is the generated dataset for a news site. The generated data includes a number of \textbf{articles} with their text, image, and/or video content. In addition, the \textbf{user} accounts and the articles which they \textbf{read} are provided. Besided the generated data, requirements also include the need of generating article metrics and popularity rankings. The entire database schemas can be found in the Appendix.
-    Summarized, this gives us the following tables:
-    %TODO: add schemas to appendix
+    Central in our investigation is the generated dataset for a news site. The generated data includes a number of \textbf{articles} with their text, image, and/or video content. In addition, the \textbf{user} accounts and the articles which they \textbf{read} are provided. Besided the generated data, requirements also include the need of generating article metrics and popularity rankings. Summarized, this gives us the following tables:
 
     \begin{itemize}
         \item \textbf{User}: Capturing personal information about users, like their name, gender, email, phone, etc.
@@ -94,7 +93,7 @@
         \item \textbf{Popular-Rank}: Aggregating \textbf{Be-Read}, this table synthesizes interaction data to rank content according to various metrics, providing insights into what is trending each day, week or month.
     \end{itemize}
 
-    With the following entity relationship diagram~\ref{fig:reference-entity-relation-diagram}.
+    With the following entity relationship diagram in \Cref{fig:reference-entity-relation-diagram}.
 
     \begin{figure}[h]
         \centering
@@ -113,7 +112,7 @@
         \item \textbf{Popular-Rank}: Fragmented based on granularity.
     \end{itemize}
 
-    Considering the loose reference infrastructure architecture provided in figure~\ref{fig:reference-infrastructure-architecture}, we see that we need the following stack:
+    Considering the loose reference infrastructure architecture provided in \Cref{fig:reference-infrastructure-architecture}, we see that we need the following stack:
 
     \begin{itemize}
         \item Some distributed systems orchestration platform
@@ -132,7 +131,7 @@
 
     For the functional requirements, we need to support bulk data loading, data insert/update/query, and monitoring of the servers and data.
 
-    Optional (advanced) requirements (see Chapter~\ref{sec:advanced-requirements}) include Hot/Cold Standby DBMSs for fault tolerance, upscaling/downscaling DBMSs, and cross DBMSs data migration.
+    Optional (advanced) requirements (see \Cref{sec:advanced-requirements}) include Hot/Cold Standby DBMSs for fault tolerance, upscaling/downscaling DBMSs, and cross DBMSs data migration.
 
     \section{Proposed Methodology}
     To construct such system that meets these requirements, we propose an integrated solution comprising several cutting-edge technologies, each selected for its proven efficacy and relevance to the project's objectives. We will first discuss the rationale behind each technology choices and then elaborate on how these technologies will be integrated to create our system.
@@ -228,14 +227,14 @@
     \subsubsection{Unstructured Data Management / MinIO}
     All articles, videos, and texts should be stored in the unstructured data layer, for which we use MinIO. We deploy MinIO with the MinIO provided Helm Chart, for which our used Helm values can be found in the s3 folder. We initialize it with an empty bucket called media, without any versioning, object-locking, or any manual replication settings. A set of default credentials is used. For demonstrative purposes, we create several data nodes and attach multiple drives to each node.
 
-    %TODO: describe election in MinIO
+    In a distributed MinIO setup, each server has a complete understanding of the distributed topology, allowing any node to handle requests and route internal communications to other nodes as necessary. There is no specific leader node or master; instead, the architecture is designed so that each node can equally participate in handling client requests and internal operations, reflecting a peer-to-peer approach.
 
     For the bulk data loading of the generated text, image, and video data, we've provided a script in s3-seed to upload all to the created bucket.
 
     \subsubsection{Structured Data Management / MongoDB}
     \textbf{Aggregation pipelines}: essentially a powerful feature that allows processing and transformation of data within the database. Aggregation pipelines provide a framework for performing complex data manipulations, aggregations, and transformations on documents in a MongoDB collection. An aggregation pipeline is a series of stages through which documents pass, with each stage performing a specific operation on the data. These stages are executed sequentially, and the result of each stage becomes the input for the next stage. The pipeline stages can include operations such as filtering, sorting, grouping, and applying various transformations.
 
-    To fulfill the requirements of the project, several aggregation pipelines were utilized (\ref{subsec:appendix-aggregation}). These results can be viewed once as a view, but also stored on disk as another table (on-demand materialized views), again allowing them to be sharded across different nodes. Whenever the original table is updated, we can rerun the aggregation pipeline to update the views. We can also run aggregation pipelines in API queries to join several tables together.
+    To fulfill the requirements of the project, several aggregation pipelines were utilized (\Cref{subsec:appendix-aggregation}). These results can be viewed once as a view, but also stored on disk as another table (on-demand materialized views), again allowing them to be sharded across different nodes. Whenever the original table is updated, we can rerun the aggregation pipeline to update the views. We can also run aggregation pipelines in API queries to join several tables together.
 
     All the different pipelines used are summarized below:
     \begin{enumerate}
@@ -285,7 +284,7 @@
         \label{tab:table-sharing}
     \end{table}
 
-    The sharding configuration was implemented using the utility functions of Mongo shell. Scripts were created for consistent and automated deployment for both the aggregation pipelines and the sharding (\ref{subsec:appendix-sharding}).
+    The sharding configuration was implemented using the utility functions of Mongo shell. Scripts were created for consistent and automated deployment for both the aggregation pipelines and the sharding (\Cref{subsec:appendix-sharding}).
 
     \subsubsection{Python API}
     The following endpoints were created in the Python API:
@@ -300,7 +299,7 @@
     Redis does not require any configuration, we can use the deployment as is in our Python API. For each Python API endpoint, first we check if the requested data is already in the Redis cache and serve it if possible. If not, we query from MongoDB and save the result back to Redis for the next query. We always write to the Redis master and read from the Redis replicas.
 
     \subsubsection{Monitoring}
-    For metric insights, there are many community-provided dashboards that work with our solution. In Grafana, it is easy to import these dashboards and visualize the metrics. Figure~\ref{fig:dashboard-minio} shows a MinIO dashboard, Figure~\ref{fig:dashboard-mongodb} shows a MongoDB dashboard, and Figure~\ref{fig:dashboard-redis} shows a Redis dashboard. Kubernetes dashboards are included by default.
+    For metric insights, there are many community-provided dashboards that work with our solution. In Grafana, it is easy to import these dashboards and visualize the metrics. \Cref{fig:dashboard-minio} shows a MinIO dashboard, \Cref{fig:dashboard-mongodb} shows a MongoDB dashboard, and \Cref{fig:dashboard-redis} shows a Redis dashboard. Kubernetes dashboards are included by default.
     \begin{figure}[h]
         \centering
         \includegraphics[width=\textwidth]{images/dashboard-minio}
@@ -320,7 +319,7 @@
         \label{fig:dashboard-redis}
     \end{figure}
 
-    For AlertManager, Grafana does not allow direct imports of third-party rules, so we have to configure the rules manually. You may choose to create alert rules based on the team's preferences. Community-made rules can be found on \url{https://samber.github.io/awesome-prometheus-alerts/rules.html}. Figure~\ref{fig:alerting-create} shows an example of an alert rule.
+    For AlertManager, Grafana does not allow direct imports of third-party rules, so we have to configure the rules manually. You may choose to create alert rules based on the team's preferences. Community-made rules can be found on \url{https://samber.github.io/awesome-prometheus-alerts/rules.html}. \Cref{fig:alerting-create} shows an example of an alert rule.
 
     \begin{figure}[h]
         \centering
