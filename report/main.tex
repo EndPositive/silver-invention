@@ -104,7 +104,7 @@
 
     For the functional requirements, we need to support bulk data loading, data insert/update/query, and monitoring of the servers and data.
 
-    Optional requirements include Hot/Cold Standby DBMSs for fault tolerance, upscaling/downscaling DBMSs, and cross DBMSs data migration.
+    Optional (advanced) requirements (see Chapter~\ref{sec:advanced-requirements}) include Hot/Cold Standby DBMSs for fault tolerance, upscaling/downscaling DBMSs, and cross DBMSs data migration.
 
     \section{Proposed Methodology}
     To construct such system that meets these requirements, we propose an integrated solution comprising several cutting-edge technologies, each selected for its proven efficacy and relevance to the project's objectives. We will first discuss the rationale behind each technology choices and then elaborate on how these technologies will be integrated to create our system.
@@ -299,6 +299,22 @@
         \caption{User Interface of creating a new alert rule in Grafana.}
         \label{fig:alerting-create}
     \end{figure}
+
+    \section{Implemented Advanced Features}\label{sec:advanced-requirements}
+    This section describes the advanced features that we implemented in our solution.
+    \subsection{Hot/Cold Standby DBMSs}
+    For MongoDB, we've implemented 2 shards with each 3 replicas. This ensures that the data is always available, even if one of the nodes fails.
+
+    For Redis, we've implemented 1 master and 3 replicas, with the same effect as MongoDB.
+
+    For S3, we've made use of MinIO erasure coding, ensuring data availability when one or more drives or nodes fail.
+
+    \subsection{Upscaling/Downscaling DBMSs}
+
+    Using Helm Charts, we can easily scale up and down the number of replicas for each component.
+
+    \subsection{Cross DBMSs Data Migration}
+    For self-hosted Kubernetes solutions, data backup and migration can often be a maintainability nightmare. We would recommend taking a look at replacing the self-hosted layers to cloud managed services that provide data backups out of the box. For example, MongoDB Atlas can be used instead of the self-hosted MongoDB, which provides a fully managed MongoDB service with data backups and migration tools. Instead of MinIO, we can use AWS S3, which provides a fully managed S3 service with data backups and migration tools. For Redis, we can use AWS ElastiCache, which provides a fully managed Redis service.
 
     \section{Evaluation and Metrics}
     The evaluation of the proposed distributed database system was conducted through a rigorous assessment of various key performance metrics, ensuring the system's efficacy in handling the specified objectives. To gauge the efficiency of data storage and retrieval, metrics such as latency, throughput, and response time are scrutinized under varying loads and concurrent user scenarios. Latency measurements provide insights into the speed of data access, reflecting the system's responsiveness to user queries and interactions.
