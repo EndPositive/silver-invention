@@ -63,14 +63,11 @@ spec:
               value: "{{ .Values.s3SecretAccessKey | default "PASSWORD" }}"
             - name: MONGODB_DB_NAME
               value: "{{ .Values.mongodbDbName | default "database" }}"
-          livenessProbe:
+          readinessProbe:
             httpGet:
               path: /liveness
               port: http
-          readinessProbe:
-            httpGet:
-              path: /readiness
-              port: http
+            timeoutSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

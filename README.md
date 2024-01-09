@@ -10,7 +10,6 @@ minikube start --kubernetes-version=v1.23 \
   --extra-config=scheduler.bind-address=0.0.0.0 \
   --extra-config=controller-manager.bind-address=0.0.0.0 \
   --image-mirror-country=cn
-minikube addons disable metrics-server
 minikube addons enable ingress
 minikube addons enable ingress-dns
 minikube tunnel

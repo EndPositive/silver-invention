@@ -15,6 +15,7 @@
 \usepackage{multirow}
 \usepackage{tabularx}
 \usepackage{cleveref}
+\usepackage{float}
 
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -46,16 +47,15 @@
 \title{Distributed Databases Project}
 
 \author{
-    Jop Zitman 2023280072\\
+    Jop Zitman\\
     Department of Computer Science\\
     Tsinghua University\\
     Beijing, China \\
-    \texttt{zitmanj10@mails.tsinghua.edu.cn}
     \and
     Borislav Pavlov\\
     Department of Computer Science\\
     Tsinghua University\\
-    \texttt{}
+    Beijing, China \\
 }
 
 
@@ -78,10 +78,6 @@
     This project is not just an academic exercise; it is a vital step towards understanding and leveraging cutting-edge big data management techniques, with profound implications for real-world applications. By dissecting and reconstructing the complexities of distributed databases, we aim to contribute meaningfully to the field's body of knowledge and pave the way for innovative solutions to data management challenges.
 
 
-    \section{Literature Review}
-    %TODO: Provide an overview of existing distributed database systems, highlighting their limitations and areas for improvement. Discuss the evolution of database technologies, from traditional relational databases to NoSQL and NewSQL systems, and the varying approaches to handling big data challenges.
-
-
     \section{Problem Statement}
     Central in our investigation is the generated dataset for a news site. The generated data includes a number of \textbf{articles} with their text, image, and/or video content. In addition, the \textbf{user} accounts and the articles which they \textbf{read} are provided. Besided the generated data, requirements also include the need of generating article metrics and popularity rankings. Summarized, this gives us the following tables:
 
@@ -95,7 +91,7 @@
 
     With the following entity relationship diagram in \Cref{fig:reference-entity-relation-diagram}.
 
-    \begin{figure}[h]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=0.5\textwidth]{images/reference-entity-relation-diagram}
         \caption{Reference Entity Relation Diagram}
@@ -112,22 +108,24 @@
         \item \textbf{Popular-Rank}: Fragmented based on granularity.
     \end{itemize}
 
-    Considering the loose reference infrastructure architecture provided in \Cref{fig:reference-infrastructure-architecture}, we see that we need the following stack:
+    Considering the loosely described reference infrastructure architecture provided in \Cref{fig:reference-infrastructure-architecture}, we see that we need the following stack:
 
     \begin{itemize}
-        \item Some distributed systems orchestration platform
-        \item Unstructured Data Management Layer
-        \item Structured Data Management Layer
-        \item Caching Layer
-        \item Application Layer
+        \item Unstructured Data Management Layer (Hadoop HDFS)
+        \item Structured Data Management Layer (DBMS)
+        \item Caching Layer (Cache)
+        \item Application Layer (APP)
+        \item Some system to orchestrate these layers
     \end{itemize}
 
-    \begin{figure}[h]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=\textwidth]{images/reference-architecture}
         \caption{Reference Infrastructure Architecture}
         \label{fig:reference-infrastructure-architecture}
     \end{figure}
+
+    The unstructured data is large files such as videos, images, and article text. The system should support large volume data transfers for these files.
 
     For the functional requirements, we need to support bulk data loading, data insert/update/query, and monitoring of the servers and data.
 
@@ -136,38 +134,55 @@
     \section{Proposed Methodology}
     To construct such system that meets these requirements, we propose an integrated solution comprising several cutting-edge technologies, each selected for its proven efficacy and relevance to the project's objectives. We will first discuss the rationale behind each technology choices and then elaborate on how these technologies will be integrated to create our system.
 
-    \subsection{Technology Choices}
+    \subsection{Technology Choices}\label{subsec:technology-choices}
+    This paragraph introduces the choices of technologies that we made and comparisons of our choices to other existing solutions (i.e. literature review).
 
     \subsubsection{Containerization with Docker}
-    Launched in 2013 as an open-source Docker Engine, Docker has become a go-to solution for portable applications. By leveraging existing computing concepts around containers, particularly in the Linux world, using primitives known as cgroups and namespaces, Docker reduces the overhead of creating and maintaining full virtual machines for running applications. This standardization of containerization has made the complex concepts of containerization more accessible and efficient for contemporary development needs. For instance, Docker's containerization technology is foundational to ensuring that our application is portable, consistent, and isolated from environmental inconsistencies across development and production platforms. This modularity is critical for testing, deployment, and allowing each component in a distributed system to be developed and deployed independently. In addition, the adaptability of the Docker Engine, supports responsive development and scaling, as Docker containers can be executed in diverse environments, from a developer's local laptop to various cloud providers. Finally, the modularity of Docker containers simplifies the process of scaling containers due to the ease and speed of creating new Docker containers.
+    Docker has become a go-to solution for portable applications. By leveraging existing computing concepts around containers, particularly in the Linux world, using primitives known as cgroups and namespaces, Docker reduces the overhead of creating and maintaining full virtual machines for running applications. This standardization of containerization has made the complex concepts of containerization more accessible and efficient for contemporary development needs. For instance, Docker's containerization technology is foundational to ensuring that our application is portable, consistent, and isolated from environmental inconsistencies across development and production platforms. This modularity is critical for testing, deployment, and allowing each component in a distributed system to be developed and deployed independently. In addition, the adaptability of the Docker Engine, supports responsive development and scaling, as Docker containers can be executed in diverse environments, from a developer's local laptop to various cloud providers. Finally, the modularity of Docker containers simplifies the process of scaling containers due to the ease and speed of creating new Docker containers.
 
-    Docker's emergence has significantly accelerated the adoption of containerization technology. By abstracting complex containerization concepts into a user-friendly format, it has become an industry standard for containers, offering simple developer tools and a universal packaging approach. The widespread adoption of Docker underscores its importance as a tool for modern software development, testing, deployment, and scaling.
+    An alternative would be to use a Virtual Machine (VM) based deployment with a VM builder like Packer or Ansible to create portable and consistent VM images. The downside with such solution would be that these VMs are relatively large compared to Docker containers and that their boot time is larger than Docker too (slow scalability). It might also be a waste to horizontally scale entire VM's, since we don't actually want to scale the OS layer.
+
+    We could also consider a solution like Amazon Lambda functions to deploy isolated parts of code, but this may be difficult to integrate with other parts of the project.
+
+    Concluding, Docker's emergence has significantly accelerated the adoption of containerization technology. By abstracting complex containerization concepts into a user-friendly format, it has become an industry standard for containers, offering simple developer tools and a universal packaging approach. The widespread adoption of Docker underscores its importance as a tool for modern software development, testing, deployment, and scaling.
 
     \subsubsection{Orchestration with Kubernetes}
     Kubernetes stands at the forefront of container orchestration technologies, automating various manual processes related to managing containers such as scheduling, launching, scaling, and healing. It can be deployed on separate compute nodes, or simply taken as a service (e.g.\ Google Kubernetes Engine), providing a central API to manage Docker containers across all nodes. It is capable of handling multiple groups of containers across these nodes, providing essential features like networking, service discovery, load balancing, and storage orchestration. Every such feature is implemented as a primitive build block that rely on the Kubernetes API, where this API is commonly extended with custom so-called Kubernetes Operators that provide more control or features (e.g. Knative Serving and Eventing Framework).
 
-    Kubernetes' extensive ecosystem and its ability to streamline deployment, scaling, and operations of application containers render it an indispensable tool for automating and managing the lifecycle of containerized applications, ensuring the system's reliability and scalability.
+    Other Orchestration platforms for Docker include Docker Compose, as it also includes many networking, volumes, etc. abstraction. We feel that it is not suitable for autoscaling out-of-the-box, while however this may be possible with third-party extensions. In addition, we like the challenge of using Kubernetes for this project such that we can learn more about it.
+
+    In summary, Kubernetes' extensive ecosystem and its ability to streamline deployment, scaling, and operations of application containers render it an indispensable tool for automating and managing the lifecycle of containerized applications, ensuring the system's reliability and scalability.
 
     \subsubsection{Package Management with Helm Charts}
     Helm enhances Kubernetes's capabilities by facilitating the definition, installation, and upgrade of even the most complex Kubernetes applications. Helm simplifies the management of creation, packaging, configuration, and deployment of applications and services to Kubernetes clusters through Helm Charts. These charts are collections of Kubernetes YAML files designed to simplify the deployment process. It also tracks the versioned history of each chart installation and change, enabling comprehensible commands to roll back to a previous version or upgrade to a newer one, thus maintaining consistency and reliability in deployments.
 
     Helm Charts are created and maintained by a range of contributors including individual developers, organizations, cloud service providers, and technology vendors. Among these, Bitnami is a prominent contributor, offering a wide range of pre-packaged, production-ready Helm charts for various applications. These charts are known for their quality and reliability, ensuring that applications deployed using Bitnami's charts meet high standards of security and performance.
 
+    The alternative is to use Kustomize, a completely logic-less alternative to Helm Charts. While it may be less complex than Helm Charts, there are not as many community-built Kustomize releases for the applications that we want to deploy.
+
     Overall, Helm significantly contributes to the Kubernetes ecosystem by offering a streamlined, efficient method for package management, ultimately enhancing the management of containerized applications. Its wide adoption underline the collaborative and community-driven approach in managing and deploying applications in containerized environments.
 
     \subsubsection{Unstructured Data Management with MinIO}
     MinIO offers an efficient and scalable solution for managing unstructured data with its high-performance, S3 compatible object storage system. It is Kubernetes-native, providing a consistent object storage interface across multiple cloud providers, on-premise, and at the edge. MinIO is recommended for complete S3 API functionality for object storage on Kubernetes. Its lightweight architecture allows it to run efficiently on low CPU and memory resources, enabling the hosting of a large number of tenants on shared hardware. This makes MinIO particularly effective in environments where resource efficiency and scalability are crucial. In addition, it provides full bucket or cluster replication, and has data fault-tolerance enabled by default using a bit-parity solution similar to RAID5/6. By supporting all core S3 features, it easy to integrate with existing S3 frameworks and easy to replace with any fully managed cloud provided object storage (considering its AGPL licence and relatively high commercial license cost).
+
+    In comparison to existing solutions like Hadoop HDFS, we feel that S3 is a better fit for modern solutions. The Docker image for HDFS has not been updated in years and the deployment documentation is rather complex. Amazon DynamoDB could be another option for unstructured data, as it could also be used for structured data. Though we believe that these 2 data types are so different that the solution should be different too (separation of concerns). It is also more conventional to store images and videos in S3. We both have experience with S3 too.
 
     In summary, MinIO's high performance, robust fault tolerance mechanisms, and compatibility with a variety of cloud storage services make it a crucial component for managing unstructured data in containerized environments. Its integration with Kubernetes enhances its capability to provide reliable and scalable object storage solutions, addressing the complex and varied data management needs of contemporary systems.
 
     \subsubsection{Structured Data Handling with MongoDB}
     MongoDB's flexible, document-oriented structure makes it particularly adept at managing structured data in our system. It is a distributed database at its core level, which stores the data into JSON-like objects, meaning that it is also a NoSQL database. Its powerful indexing and querying capabilities, and support for complex aggregations and transactions ensure that our structured data is handled efficiently and effectively. The easy of sharding different tables across nodes makes it an easy choice for our requirements. The Bitnami Helm chart is a popular, well-documented option for deploying MongoDB, offering various configurations like standalone, replica set, or replica set with arbiters, simplifying the deployment and management of MongoDB within Kubernetes.
 
+    The data generation was provided in MongoDB and Postgres format. Considering that Postgres does not support sharding, the choice was easy to make.
+
     \subsubsection{Caching with Redis}
     Redis, an in-memory key-value data store provides a performant solution for short-lived data, such as message queues or caches. By using an in-memory database for the most frequently queried data, we can accelerate data retrieval and reduce load on the databases. Its integration with Kubernetes ensures scalable and efficient management of cache instances, further optimizing the performance and responsiveness of applications. This makes it an ideal choice for caching needs.
 
+    An popular alternative would be memcached, but memcached does not support replication, which may impact the efficiacy of its use as a cache in a high load environment.
+
     \subsubsection{API Development with FastAPI}
-    FastAPI is an excellent choice for bootstrapping projects due to ease of use. Its asynchronous handling is particularly beneficial for IO-bound tasks, common with interactions in MongoDB, Redis, and S3. The framework's straightforward design, complete with automatic API documentation, significantly eases the development and management of complex services. Moreover, it provides documentation by integration of Swagger UI and ReDoc automatically generated based on the type hints and function signatures, making it easy to understand and test the API. Thus, FastAPI stands out as a robust, efficient, and developer-friendly option for building APIs in demanding and dynamic environments.
+    We choose to use Python to develop the API because of the high number of third party packages available for the components that we use and because it allows for extremely high development speed.
+
+    For the API, FastAPI is an excellent choice for bootstrapping projects due to ease of use. Its asynchronous handling is particularly beneficial for IO-bound tasks, common with interactions in MongoDB, Redis, and S3. The framework's straightforward design, complete with automatic API documentation, significantly eases the development and management of complex services. Moreover, it provides documentation by integration of Swagger UI and ReDoc automatically generated based on the type hints and function signatures, making it easy to understand and test the API. Thus, FastAPI stands out as a robust, efficient, and developer-friendly option for building APIs in demanding and dynamic environments.
 
     Note that FastAPI may not be a good choice for large scale enterprise applications, due to it being so simple. For large codebases, one may look at projects such as Django. Considering that the focus of this project should be on the database integration, we deemed the ease of development the most important factor in choosing an API framework.
 
@@ -191,6 +206,15 @@
 
     Together, Prometheus, Grafana, and AlertManager, when deployed via the Prometheus Operator and utilizing ServiceMonitors and PodMonitors, create a powerful, scalable monitoring solution that can adapt to the changing landscape of a distributed system, providing vital metrics and alerts to maintain system health and performance.
 
+    We choose this stack because we have experience with it and because many of the Bitnami charts support this stack out-of-the-box. We believe that the monitoring stack you choose will always be impacted by the other integration you use. For example, you may be more geared towards the ELK stack if you use other ElasticSearch products (such as its vector store). Some other stacks for reference:
+
+    \begin{itemize}
+        \item ELK (ElasticSearch, LogStash, Kibana)
+        \item TIG (InfluxDB, Telegraf, and Grafana)
+        \item Datadog
+        \item and many more
+    \end{itemize}
+
     \subsection{System Architecture}
     This section provides an overview of the deployment and interaction of various components within the system. Our architecture is designed for scalability, high availability, and robust monitoring, utilizing a combination of Kubernetes, databases, storage solutions, and a Python API.
 
@@ -207,13 +231,13 @@
 
     \textbf{Redis:} Deployed with 1 master and 3 replicas without persistence and with service and pod monitors included.
 
-    \textbf{API:} Simple K8s service and deployment with 3 replicas.
+    \textbf{API:} The default Helm Chart has been used to deploy a Deployment, Horizontal Auto Pod Scaler to provide a scalable solution.
 
     \subsubsection{Component Interaction}
 
     Kubernetes orchestrates all components, managing their lifecycle, scaling, and networking. The Python API interacts with Minio for object storage, MongoDB for persistent data storage, and Redis for caching. Monitoring tools are integrated throughout, with Prometheus gathering metrics, Grafana for visualization, and Alertmanager handling alerts.
 
-    \begin{figure}[h]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=\textwidth]{images/architecture}
         \caption{Solution Infrastructure}
@@ -229,12 +253,12 @@
 
     In a distributed MinIO setup, each server has a complete understanding of the distributed topology, allowing any node to handle requests and route internal communications to other nodes as necessary. There is no specific leader node or master; instead, the architecture is designed so that each node can equally participate in handling client requests and internal operations, reflecting a peer-to-peer approach.
 
-    For the bulk data loading of the generated text, image, and video data, we've provided a script in s3-seed to upload all to the created bucket.
+    For the bulk data loading of the generated text, image, and video data, we've provided a script in the `s3-seed` directory to upload all to the created bucket.
 
     \subsubsection{Structured Data Management / MongoDB}
     \textbf{Aggregation pipelines}: essentially a powerful feature that allows processing and transformation of data within the database. Aggregation pipelines provide a framework for performing complex data manipulations, aggregations, and transformations on documents in a MongoDB collection. An aggregation pipeline is a series of stages through which documents pass, with each stage performing a specific operation on the data. These stages are executed sequentially, and the result of each stage becomes the input for the next stage. The pipeline stages can include operations such as filtering, sorting, grouping, and applying various transformations.
 
-    To fulfill the requirements of the project, several aggregation pipelines were utilized (\Cref{subsec:appendix-aggregation}). These results can be viewed once as a view, but also stored on disk as another table (on-demand materialized views), again allowing them to be sharded across different nodes. Whenever the original table is updated, we can rerun the aggregation pipeline to update the views. We can also run aggregation pipelines in API queries to join several tables together.
+    To fulfill the requirements of the project, several MongoDB aggregation pipelines were utilized (\Cref{subsec:appendix-aggregation}). These results can be viewed once as a view, but also stored on disk as another table (on-demand materialized views), again allowing them to be sharded across different nodes. Whenever the original table is updated, we can rerun the aggregation pipeline to update the views. We can also run aggregation pipelines in API queries to join several tables together.
 
     All the different pipelines used are summarized below:
     \begin{enumerate}
@@ -250,15 +274,7 @@
         \item \textbf{Table Science Articles}: One of the requirements is to allocate science articles into every shard in the cluster, however, MongoDB doesn't support duplicated data as it is against the design principles behind the sharded cluster. Hence, a new on-demand materialized view is created by getting all the articles with the category science from the Article table and putting them into a new table Articles-Science. The same strategy is applied for the Be-Reads table as it has to be sharded in the same way as the Article table.
     \end{enumerate}
 
-    An overview of the relevant data and finalized data is given below. 
-    \begin{figure}[h]
-        \centering
-        \includegraphics[width=\textwidth]{images/schema}
-        \caption{MongoDB Data Overview}
-        \label{fig:schema}
-    \end{figure}
-
-    \begin{table}[h]
+    \begin{table}[H]
         \centering
         \begin{tabularx}{\textwidth}{|c|c|X|}
             \hline
@@ -296,23 +312,23 @@
     \end{enumerate}
 
     \subsubsection{Redis}
-    Redis does not require any configuration, we can use the deployment as is in our Python API. For each Python API endpoint, first we check if the requested data is already in the Redis cache and serve it if possible. If not, we query from MongoDB and save the result back to Redis for the next query. We always write to the Redis master and read from the Redis replicas.
+    We use the existing Python package fastapi-cache (\url{https://github.com/long2ice/fastapi-cache}) that acts as a middleware for FastAPI that creates cache keys based on the request, checking in Redis before executing our API code. If the key did not exist, this package will automatically add our response to Redis.
 
     \subsubsection{Monitoring}
     For metric insights, there are many community-provided dashboards that work with our solution. In Grafana, it is easy to import these dashboards and visualize the metrics. \Cref{fig:dashboard-minio} shows a MinIO dashboard, \Cref{fig:dashboard-mongodb} shows a MongoDB dashboard, and \Cref{fig:dashboard-redis} shows a Redis dashboard. Kubernetes dashboards are included by default.
-    \begin{figure}[h]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=\textwidth]{images/dashboard-minio}
         \caption{MinIO: \url{https://grafana.com/grafana/dashboards/13502/}}
         \label{fig:dashboard-minio}
     \end{figure}
-    \begin{figure}[h]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=\textwidth]{images/dashboard-mongodb}
         \caption{MongoDB: \url{https://grafana.com/grafana/dashboards/12079/} any "percona" dashboard works.}
         \label{fig:dashboard-mongodb}
     \end{figure}
-    \begin{figure}[h]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=\textwidth]{images/dashboard-redis}
         \caption{Redis: \url{https://grafana.com/grafana/dashboards/11835/}}
@@ -321,7 +337,7 @@
 
     For AlertManager, Grafana does not allow direct imports of third-party rules, so we have to configure the rules manually. You may choose to create alert rules based on the team's preferences. Community-made rules can be found on \url{https://samber.github.io/awesome-prometheus-alerts/rules.html}. \Cref{fig:alerting-create} shows an example of an alert rule.
 
-    \begin{figure}[h]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=\textwidth]{images/alerting-create}
         \caption{User Interface of creating a new alert rule in Grafana.}
@@ -337,6 +353,8 @@
 
     For S3, we've made use of MinIO erasure coding, ensuring data availability when one or more drives or nodes fail.
 
+    Finally, the exact uptime requirements dictate the number of replicas the system needs. If uptime is extremely important, it may make more sense to increase the number of replicas.
+
     \subsubsection{Upscaling/Downscaling DBMSs}
 
     Using Helm Charts, we can easily scale up and down the number of replicas for each component.
@@ -345,19 +363,52 @@
     For self-hosted Kubernetes solutions, data backup and migration can often be a maintainability nightmare. We would recommend taking a look at replacing the self-hosted layers to cloud managed services that provide data backups out of the box. For example, MongoDB Atlas can be used instead of the self-hosted MongoDB, which provides a fully managed MongoDB service with data backups and migration tools. Instead of MinIO, we can use AWS S3, which provides a fully managed S3 service with data backups and migration tools. For Redis, we can use AWS ElastiCache, which provides a fully managed Redis service.
 
     \section{Evaluation and Metrics}
-    The evaluation of the proposed distributed database system was conducted through a rigorous assessment of various key performance metrics, ensuring the system's efficacy in handling the specified objectives. To gauge the efficiency of data storage and retrieval, metrics such as latency, throughput, and response time are scrutinized under varying loads and concurrent user scenarios. Latency measurements provide insights into the speed of data access, reflecting the system's responsiveness to user queries and interactions.
-    
-    Scalability, a critical aspect of the envisioned system, was evaluated by stress testing the system to determine its capacity to seamlessly handle increasing data volumes and user loads. The system exhibits robust scalability, with the ability to gracefully adapt to dynamic workloads, and demonstrates optimal performance even under peak stress conditions. Scaling operations, such as the addition of nodes or resources, showcase the system's responsiveness and agility, ensuring it can meet evolving demands effortlessly.
-    
-    Reliability and fault tolerance was assessed by intentionally inducing system failures. The system boasts an impressive uptime of $ 99.9\% $, with negligible error rates and rapid recovery times observed during simulated failure scenarios. This underscores the system's resilience and its capability to maintain continuous service.
-    
-    Data management performance of both structured and unstructured data stores—MongoDB and MinIO—will were thoroughly evaluated. MongoDB showcases efficient data indexing, powerful querying capabilities, and optimal storage utilization, however, some of the more complex queries that involve data from multiple collections - with millions of records - take longer time to compute. Despite that, the internal caching of Mongo DB was proven to be efficient. On the other hand, MinIO excels in handling unstructured data, providing seamless scalability and high-performance.
-    
-    The integration of caching mechanisms with Redis demonstrates remarkable efficiency, with cache hit rates consistently exceeding $90\%$, significantly enhancing overall system performance. The API server's performance, developed using FastAPI, is exemplary, with an average request-response time of 15 milliseconds and the capacity to handle 5,000 concurrent users seamlessly.
-    
-    Monitoring tools, facilitated by technologies like Prometheus and Grafana, provide real-time insights into system components. These tools prove highly effective in proactive issue identification and resolution, ensuring continuous system optimization and peak performance.
-    
-    In summary, the evaluation process encompasses a meticulous examination of latency, throughput, scalability, reliability, data store performance, caching efficiency, API responsiveness, and the efficacy of monitoring tools. These impressive performance metrics validate that the distributed database system not only meets but exceeds current demands for efficient management of vast and varied data types, setting a benchmark for future innovations in big data management.
+    For the evaluation of this project, we've conducted several rigorous tests to ensure the system's efficacy in handling the specified requirements. We performed latency testing for the API and performed Chaos Engineering to test the fault tolerance of the system. The following sections describe the evaluation process and the results.
+
+    \subsection{API Latency}
+    For the API, we've conducted a load test using Locust, a Python framework for load testing. The test files can be found in the `load` directory. When performing the load test, we seek to see no big increase in latency. The API should automatically horizontally scale to handle the load if needed.
+
+    The results can be seen in \Cref{fig:load-testing}. You can clearly see that around 08:03:40, the rate per second increases and the latency decreases. The same can be seen around 08:06:02. This is the Kubernetes Horizontal Pod Autoscaler (HPA) automatically scaling the number of pods in our API deployment. There were never any errors. The latency becomes relatively high before the scaler is activated, but this is not due to the limits of the HPA, but rather due to the update time of the metrics. Kubernetes by default exports metrics every 20 seconds, and the HPA takes a while to process the new metrics. The load test was conducted with 1 extra user per second, leading to a high sudden increase in request before the resource metrics are even updated. Depending on the expected user access structure (spike or gradual), this solution may suffice.
+
+    Finally, the exact scaling requirements depend heavily on the user behaviour, environment and better defined requirements or limitations proposed by the company. The number of replicas used, or resources assigned is just set as an example.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\textwidth]{images/load-testing-success}
+        \caption{API scalability testing}
+        \label{fig:load-testing}
+    \end{figure}
+
+    \subsection{Disk Fault Tolerance}
+
+    For MinIO, we've manually removed files from the drives in order to test the fault tolerance features. The `mcli admin heal` command detected the bitrot within a few minutes and restored the file. This process also runs on interval.
+
+    \subsection{Node Fault Tolerance}
+
+    We've tried to delete random pods in the cluster, and test the workings of the API. We sometimes see higher latency (due to the system needing to heal), but never permanent errors.
+
+    \subsubsection{KubeDOOM}
+    We've used KubeDOOM to test the fault tolerance of the system. KubeDOOM is a tool that randomly kills pods in the cluster when you play the video game DOOM. We've configured it to kill pods in each of the deployed namespaces. Just like the manual node fault tolerance test, we did not see any permanent errors.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\textwidth]{images/kubedoom}
+        \caption{KubeDOOM deleting MinIO pods}
+        \label{fig:kubedoom}
+    \end{figure}
+
+    \subsection{Caching}
+
+    The integration of caching mechanisms with Redis significantly enhances the API performance. The example request in \Cref{fig:cache} shows a speedup from 26 ms to only 3 ms. The last request headers show the etag value, indicating that the response was indeed cached.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\textwidth]{images/cache}
+        \caption{Performing a request twice shows an improved latency due to caching}
+        \label{fig:cache}
+    \end{figure}
+
+    In summary, the evaluation process encompasses an examination of latency, throughput, scalability, reliability, data store performance, caching efficiency, and API responsiveness. These metrics validate that the distributed database system meets the requirements of a modern scalable solution.
 
     \section{Conclusion}
     In conclusion, we have successfully implemented a distributed database system that meets the requirements of the project. We have also implemented several advanced features, including hot/cold standby DBMSs, upscaling/downscaling DBMSs, and cross DBMSs data migration. The system is highly performant, scalable, and reliable, with the ability to handle large volumes of data and concurrent users seamlessly. The system's efficacy in managing structured and unstructured data, and its robust caching mechanisms, ensure optimal performance and responsiveness. The integration of monitoring tools provides real-time insights into system components, enabling proactive issue identification and resolution. Overall, the system's performance tests validate its ability to meet current demands for efficient management of vast and varied data types.

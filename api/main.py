@@ -71,7 +71,6 @@ app = FastAPI(lifespan=lifespan)
 
 
 # probes
-@app.get("/readiness", include_in_schema=False)
 @app.get("/liveness", include_in_schema=False)
 async def readiness_probe():
     # return empty HTTP response with 200
@@ -174,7 +173,7 @@ async def docs_redirect():
 
 @app.get("/users")
 @cache(expire=60)
-async def get_user_by(id: int = None, uid: int = None,
+async def get_user_by(id: str = None, uid: int = None,
                       name: str = None, gender: str = None, email: str = None,
                       phone: str = None, dept: str = None, grade: str = None,
                       language: str = None, region: str = None, role: str = None,
@@ -185,7 +184,7 @@ async def get_user_by(id: int = None, uid: int = None,
 
 @app.get("/articles")
 @cache(expire=60)
-async def get_article_by(id: int = None, aid: int = None,
+async def get_article_by(id: str = None, aid: int = None,
                          timestamp: str = None, title: str = None, category: str = None,
                          language: str = None, skip: int = 0, limit: int = 10):
     rows = await get_data_by_query(mongo_db["articles"], **locals())
